@@ -1242,7 +1242,8 @@
                 const finalX = (baseX + modX) >> 12;
                 const finalZ = (baseZ + modZ) >> 12;
 
-                results[entry.key] = { x: finalX, z: finalZ };
+                // fx/fz: exact fx32 position (before >> 12), used by distance.js
+                results[entry.key] = { x: finalX, z: finalZ, fx: baseX + modX, fz: baseZ + modZ };
             });
 
             return results;
@@ -1350,7 +1351,7 @@
                 const finalX = (baseX + modX) >> 12;
                 const finalZ = (baseZ + modZ) >> 12;
 
-                results[index] = { x: finalX, z: finalZ };
+                results[index] = { x: finalX, z: finalZ, fx: baseX + modX, fz: baseZ + modZ };
             });
 
             return results;
@@ -1788,5 +1789,6 @@
 
         run();
     </script>
+    <script src="distance.js"></script>
 </body>
 </html>
