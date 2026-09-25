@@ -26,6 +26,7 @@
         @media (max-width: 600px) {
             body { padding: 8px; }
             .app-side > .panel { padding: 10px; }
+            .srch-panel .srch-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
             .srch-table { font-size: 13px; }
             .srch-table th, .srch-table td { padding: 3px 5px; }
         }

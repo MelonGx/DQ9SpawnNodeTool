@@ -446,7 +446,7 @@
             .srch-panel .srch-note { color: #999; font-size: 12px; }
             .srch-panel .srch-head { color: #fff; font-weight: bold; }
             .srch-panel input[type=checkbox] { width: auto; margin: 0; }
-            .srch-panel .srch-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 6px 10px; width: 100%; }
+            .srch-panel .srch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); align-items: end; gap: 6px 10px; width: 100%; }
             .srch-panel .srch-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
             .srch-panel .srch-cell > label { color: #aaa; font-size: 13px; text-align: left; justify-self: start; }
             .srch-panel .srch-cell select, .srch-panel .srch-cell input { width: 100%; box-sizing: border-box; min-width: 0; }
