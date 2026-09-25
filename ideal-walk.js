@@ -272,8 +272,8 @@ function createIdealWalk(px = 16, tkg) {
         const mask = new Uint8Array(freeW * freeH), per = 0x1000 / CELL;
         for (const k of avoid) {
             const fx = Math.floor(points[k].x / 0x1000), fy = Math.floor(points[k].y / 0x1000);
-            for (let y = (fy - 1) * per; y < (fy + 1) * per; y++) {
-                for (let x = (fx - 1) * per; x < (fx + 1) * per; x++) {
+            for (let y = fy * per; y < (fy + 1) * per; y++) {
+                for (let x = fx * per; x < (fx + 1) * per; x++) {
                     if (x >= 0 && y >= 0 && x < freeW && y < freeH) mask[y * freeW + x] = 1;
                 }
             }
@@ -281,12 +281,30 @@ function createIdealWalk(px = 16, tkg) {
         return mask;
     }
 
-    const otherStairs = (points, stairs, src, dst) => stairs.filter(k => k !== src && k !== dst && points[k]);
+    const otherStairs = (points, stairs, src, dst, starts) =>
+        stairs.filter(k => (k !== src || (starts && starts[k])) && k !== dst && points[k]);
 
-    function gridShortest(points, src, targets, blocked) {
+    function upStairsStart(fine, tile, grid) {
+        const solid = (x, y) => { const t = grid[y] && grid[y][x]; return t === undefined || t === tkg.TILE_WALL || t === tkg.TILE_DIVIDER; };
+        const [dx, dy] = !solid(tile.x, tile.y + 1) ? [0, 1] : !solid(tile.x + 1, tile.y) ? [1, 0]
+            : !solid(tile.x - 1, tile.y) ? [-1, 0] : !solid(tile.x, tile.y - 1) ? [0, -1] : [0, 1];
+        return { x: (fine.x + dx + 0.5) * 0x1000, y: (fine.z + dy + 0.5) * 0x1000, smallCell: true };
+    }
+
+    function startCells(from) {
+        if (!from.smallCell) { const c = cellOf(from); return free[c] === 1 ? [c] : []; }
+        const per = 0x1000 / CELL, fx = Math.floor(from.x / 0x1000), fy = Math.floor(from.y / 0x1000), out = [];
+        for (let y = fy * per; y < (fy + 1) * per; y++) {
+            for (let x = fx * per; x < (fx + 1) * per; x++) if (isFree(x, y)) out.push(y * freeW + x);
+        }
+        return out;
+    }
+
+    const startOf = (points, src, starts) => (starts && starts[src]) || points[src];
+
+    function gridShortest(points, src, targets, blocked, from) {
         const W = freeW, H = freeH;
         const g = new Float64Array(W * H).fill(Infinity), closed = new Uint8Array(W * H);
-        const start = cellOf(points[src]);
         const left = new Set(targets.map(t => cellOf(points[t])));
         const h = c => {
             let best = Infinity;
@@ -296,7 +314,7 @@ function createIdealWalk(px = 16, tkg) {
         };
         const heap = makeHeap(byKey);
         const open = (x, y) => isFree(x, y) && !(blocked && blocked[y * W + x]);
-        if (free[start] === 1) { g[start] = 0; heap.push([h(start), start]); }
+        for (const start of startCells(from)) { g[start] = 0; heap.push([h(start), start]); }
         while (heap.size && left.size) {
             const u = heap.pop()[1];
             if (closed[u]) continue;
@@ -320,32 +338,32 @@ function createIdealWalk(px = 16, tkg) {
         return targets.map(t => g[cellOf(points[t])] / PX);
     }
 
-    function gridFrom(points, src, stairs) {
+    function gridFrom(points, src, stairs, starts) {
         const dist = points.map(() => Infinity);
         const groups = new Map();
         points.forEach((p, j) => {
             if (!p) return;
-            const avoid = otherStairs(points, stairs, src, j), key = avoid.join(',');
+            const avoid = otherStairs(points, stairs, src, j, starts), key = avoid.join(',');
             if (!groups.has(key)) groups.set(key, { avoid, targets: [] });
             groups.get(key).targets.push(j);
         });
         for (const { avoid, targets } of groups.values()) {
-            const d = gridShortest(points, src, targets, stairsCells(points, avoid));
+            const d = gridShortest(points, src, targets, stairsCells(points, avoid), startOf(points, src, starts));
             targets.forEach((j, k) => { dist[j] = d[k]; });
         }
         return dist;
     }
 
     const DIRS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
-    function gridPath(points, src, dst, stairs) {
+    function gridPath(points, src, dst, stairs, starts) {
         const W = freeW, N = W * freeH;
-        const blocked = stairsCells(points, otherStairs(points, stairs, src, dst));
+        const blocked = stairsCells(points, otherStairs(points, stairs, src, dst, starts));
         const open = (x, y) => isFree(x, y) && !(blocked && blocked[y * W + x]);
         const nearWall = (x, y) => {
             for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) if ((ox || oy) && !isFree(x + ox, y + oy)) return 1;
             return 0;
         };
-        const start = cellOf(points[src]), goal = cellOf(points[dst]);
+        const firsts = startCells(startOf(points, src, starts)), goal = cellOf(points[dst]);
         const S = N * 9;
         const sa = new Int32Array(S).fill(-1), sb = new Int32Array(S), st = new Int32Array(S), sw = new Int32Array(S);
         const prev = new Int32Array(S).fill(-1), done = new Uint8Array(S);
@@ -357,9 +375,11 @@ function createIdealWalk(px = 16, tkg) {
         const gx = goal % W, gy = (goal / W) | 0;
         const h = c => octileSteps(c % W - gx, ((c / W) | 0) - gy);
         const heap = makeHeap((x, y) => Math.abs(x[0] - y[0]) > 1e-9 ? x[0] < y[0] : (x[1] - y[1] || x[2] - y[2]) < 0);
-        if (free[start] !== 1) return [];
-        const s0 = start * 9 + 8;
-        sa[s0] = 0; heap.push([h(start), 0, 0, 0, 0, s0]);
+        if (!firsts.length) return [];
+        for (const start of firsts) {
+            const s0 = start * 9 + 8;
+            sa[s0] = 0; heap.push([h(start), 0, 0, 0, 0, s0]);
+        }
         let end = -1;
         while (heap.size) {
             const [, t, w, a, b, u] = heap.pop();
@@ -445,5 +465,5 @@ function createIdealWalk(px = 16, tkg) {
         return off === undefined ? null : base * 0x1000 + off;
     }
 
-    return { TILE, setFloor, setFloorTiles, gridFrom, gridPath, shortest, exactCoord };
+    return { TILE, setFloor, setFloorTiles, gridFrom, gridPath, shortest, exactCoord, upStairsStart };
 }

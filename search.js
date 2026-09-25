@@ -48,6 +48,7 @@
                     .concat(tkg.calculateChestCoords(hex, floor1, envName).map((c, i) => pt(c, chestTiles[i]))),
                 tiles: [ctx.upStairs, ctx.downStairs].concat(chestTiles),
                 context: ctx,
+                starts: st.up && ctx.upStairs ? { 0: walk.upStairsStart(st.up, ctx.upStairs, tkg.grid) } : null,
                 info: { grid: tkg.grid, width: tkg.width, height: tkg.height, bitfield: tkg.bitfield, env: tkg.envIndices[envName] },
             };
         }
@@ -59,11 +60,11 @@
                 const cols = fd.points.flatMap((p, j) => p ? [j] : []);
                 if (exact) {
                     walk.setFloor(fd.info);
-                    const d = walk.gridFrom(fd.points, i, [0, 1]);
+                    const d = walk.gridFrom(fd.points, i, [0, 1], fd.starts);
                     for (const j of cols) row[j] = d[j];
                 } else {
                     tileWalk.setFloorTiles(fd.info);
-                    const valid = fd.points.map(p => p || { x: 0, y: 0 });
+                    const valid = fd.points.map((p, j) => (fd.starts && fd.starts[j] && j === i) || p || { x: 0, y: 0 });
                     const d = tileWalk.shortest(valid, i, cols);
                     for (const j of cols) row[j] = j === i ? 0 : Math.max(0, d[j] - LB_SLACK);
                 }
@@ -172,7 +173,7 @@
                         hits++;
                         const res = fastestCost(seed, hit.limit, bound());
                         if (!res) continue;
-                        insert(Object.assign(base, { name: eng.mapName, boss: eng.bossName, fc: eng.floorCount,
+                        insert(Object.assign(base, { name: eng.mapName, type: C.ENV_NAMES[eng.env][0], boss: eng.bossName, fc: eng.floorCount,
                                                      cost: res.cost, per: res.per }));
                     } else {
                         const rows = itemRows(eng, job, seed, r);
@@ -564,6 +565,7 @@
         bind("srch3rd", thirdJob);
 
         document.getElementById("srchResults").addEventListener("click", e => {
+            if (e.target.closest(".tip")) return;
             const stop = e.target.closest(".srch-stop");
             if (stop) { showStop(stop); return; }
             const tr = e.target.closest("tr.srch-pick");
@@ -621,18 +623,19 @@
     const fmt = c => c === Infinity ? 'unreachable' : c.toFixed(3);
 
     function renderFastestResults(items) {
-        const head = `<tr><th>#</th><th>Seed</th><th>Rank</th><th class="srch-left">Map</th><th class="srch-left">Boss</th><th>Floors</th><th>Ideal Walk</th><th class="srch-left">Per floor</th></tr>`;
+        const head = `<tr><th>#</th><th>Seed</th><th>Rank</th><th class="srch-left">Map</th><th class="srch-left">Type</th><th class="srch-left">Boss</th><th>F</th><th>Steps</th></tr>`;
         const rows = items.map((it, i) => {
-            const per = it.per.map((c, f) => `B${f + 1}F ${c.toFixed(2)}`).join('  ');
+            const per = it.per.map((c, f) => `B${f + 1}F ${c.toFixed(2)}`).join(' / ');
             return `<tr class="srch-pick" data-i="${i}" data-seed="${hex4(it.seed)}" title="Show the route">` +
                    `<td>${i + 1}</td><td>${hex4(it.seed)}</td><td>${it.rStr}</td><td class="srch-left">${it.name}</td>` +
-                   `<td class="srch-left">${it.boss}</td><td>${it.fc}</td><td><b>${fmt(it.cost)}</b></td><td class="srch-floors">${per}</td></tr>`;
+                   `<td class="srch-left">${it.type}</td><td class="srch-left">${it.boss}</td><td>${it.fc}</td>` +
+                   `<td><b>${fmt(it.cost)}</b><span class="tip" tabindex="0" data-tip="${per}">ⓘ</span></td></tr>`;
         }).join("");
         document.getElementById("srchResults").innerHTML = items.length ? head + rows : "";
     }
 
     function renderItemResults(items) {
-        const head = `<tr><th>#</th><th>Seed</th><th>Rank</th><th class="srch-left">Map</th><th>Floors</th><th>Ideal Walk</th><th class="srch-left">Hit</th></tr>`;
+        const head = `<tr><th>#</th><th>Seed</th><th>Rank</th><th class="srch-left">Map</th><th>F</th><th>Steps</th><th class="srch-left">Hit</th></tr>`;
         let n = 0;
         const rows = items.map((it, i) => {
             if (it.header) return `<tr><td colspan="7" class="srch-left"><b>${it.header}</b></td></tr>`;

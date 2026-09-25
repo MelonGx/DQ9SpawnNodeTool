@@ -71,10 +71,12 @@
                         env: envIndices[getEnvironment(mapContext.field_0.mapseed)] });
         const points = collectPoints();
         const stairs = points.map((p, k) => (p.key === 'up' || p.key === 'down') ? k : -1).filter(k => k >= 0);
+        const up = points.findIndex(p => p.key === 'up');
+        const starts = up >= 0 ? { [up]: walk.upStairsStart(mapContext.stairsCoords.up, mapContext.upStairs, mapGrid) } : null;
 
         const dist = {}, dq9at = {};
         points.forEach((a, i) => {
-            const d = walk.gridFrom(points, i, stairs);
+            const d = walk.gridFrom(points, i, stairs, starts);
             points.forEach((b, j) => {
                 const id = a.key + '>' + b.key;
                 dist[id] = d[j];
@@ -86,7 +88,7 @@
         const path = id => {
             if (!(id in paths)) {
                 const [f, t] = id.split('>'), i = points.findIndex(p => p.key === f), j = points.findIndex(p => p.key === t);
-                paths[id] = (i < 0 || j < 0 || i === j) ? [] : walk.gridPath(points, i, j, stairs);
+                paths[id] = (i < 0 || j < 0 || i === j) ? [] : walk.gridPath(points, i, j, stairs, starts);
             }
             return paths[id];
         };
