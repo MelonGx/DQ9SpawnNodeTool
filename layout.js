@@ -29,6 +29,16 @@
             .srch-table { font-size: 13px; }
             .srch-table th, .srch-table td { padding: 3px 5px; }
         }
+        @media (pointer: fine) {
+            .app-side .srch-panel, .app-side .dist-panel { gap: 6px; }
+            .app-side .srch-panel select, .app-side .srch-panel input, .app-side .srch-panel button,
+            .app-side .dist-panel select { font-size: 13px; padding: 2px 4px; }
+            .app-side .srch-panel label, .app-side .dist-panel label { font-size: 13px; }
+            .app-side .srch-panel .srch-cell > label { font-size: 12px; }
+            .app-side .srch-panel .srch-grid { gap: 3px 8px; }
+            .app-side .srch-panel .srch-boxes input.srch-box { width: 32px; padding: 1px 3px; }
+            .app-side .srch-panel .srch-row input.srch-hex { width: 52px; }
+        }
         @media (pointer: coarse) {
             input[type=checkbox] { width: 20px; height: 20px; vertical-align: middle; }
             .srch-table .srch-stop { padding: 6px 6px; }
