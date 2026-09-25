@@ -15,7 +15,7 @@
     const PATH_COLOR = "#ff00ff";
 
     let free = [];                  // free[y][x]: walkable tile
-    let state = null;               // { points, dist, straight, diag, paths }
+    let state = null;               // { points, dist, straight, diag, dq9at, paths }
     let sel = { from: 'up', to: 'down' };
 
     function isFree(cx, cy) {
@@ -132,6 +132,46 @@
         return octileLegs(p, mid, depth - 1).concat(octileLegs(mid, q, depth - 1));
     }
 
+    // DQ9AT's calcPointWalkCost, for side-by-side display (not an equivalent of the distance above):
+    // A* between tile centres, orthogonal step 1, diagonal step 1.5, diagonal only when both
+    // orthogonal neighbours are walkable (no corner cutting). Only the tile edge is shared with our model.
+    const DQ9AT_DIAG = 1.5;
+    function dq9atStepCost(sx, sy, tx, ty) {
+        const w = mapWidth, h = mapHeight;
+        const g = new Float64Array(w * h).fill(Infinity);
+        const closed = new Uint8Array(w * h);
+        const hScore = (x, y) => {
+            const dx = Math.abs(x - tx), dy = Math.abs(y - ty);
+            return Math.max(dx, dy) + (DQ9AT_DIAG - 1) * Math.min(dx, dy);
+        };
+        const open = [sy * w + sx];
+        g[sy * w + sx] = 0;
+        while (open.length) {
+            let bi = 0;
+            for (let i = 1; i < open.length; i++) {
+                const a = open[i], b = open[bi];
+                if (g[a] + hScore(a % w, (a / w) | 0) < g[b] + hScore(b % w, (b / w) | 0)) bi = i;
+            }
+            const cur = open.splice(bi, 1)[0];
+            if (closed[cur]) continue;
+            closed[cur] = 1;
+            const cx = cur % w, cy = (cur / w) | 0;
+            if (cx === tx && cy === ty) return g[cur];
+            for (let oy = -1; oy <= 1; oy++) {
+                for (let ox = -1; ox <= 1; ox++) {
+                    if (!ox && !oy) continue;
+                    const nx = cx + ox, ny = cy + oy;
+                    if (!isFree(nx, ny)) continue;
+                    if (ox && oy && (!isFree(cx + ox, cy) || !isFree(cx, cy + oy))) continue;
+                    const ng = g[cur] + (ox && oy ? DQ9AT_DIAG : 1);
+                    const ni = ny * w + nx;
+                    if (ng < g[ni]) { g[ni] = ng; open.push(ni); }
+                }
+            }
+        }
+        return Infinity;
+    }
+
     function collectPoints() {
         const pts = [];
         const sc = mapContext.stairsCoords || {};
@@ -169,12 +209,13 @@
         }
 
         // straight / diag: tiles walked orthogonally / diagonal steps (1 tile on both axes) on that path
-        const dist = {}, straight = {}, diag = {}, paths = {};
+        const dist = {}, straight = {}, diag = {}, dq9at = {}, paths = {};
         points.forEach((a, i) => {
             const res = dijkstra(nodes, adj, i);
             points.forEach((b, j) => {
                 const id = a.key + '>' + b.key;
                 dist[id] = res.dist[j];
+                dq9at[id] = dq9atStepCost(a.tx, a.ty, b.tx, b.ty);
 
                 const chain = [];
                 for (let v = j; v >= 0 && res.dist[j] < Infinity; v = res.prev[v]) chain.unshift(nodes[v]);
@@ -190,7 +231,7 @@
             });
         });
 
-        state = { points, dist, straight, diag, paths };
+        state = { points, dist, straight, diag, dq9at, paths };
     }
 
     function drawPath(walk) {
@@ -249,7 +290,9 @@
         } else {
             const a = state.straight[id], b = state.diag[id];
             result.innerHTML =
-                `<div>距離：<b>${fmt(d, 3)}</b> 格 ＝ 直走 ${a.toFixed(3)} 格 ＋ 斜走 ${b.toFixed(3)} 步 × √2</div>`;
+                `<div>距離：<b>${fmt(d, 3)}</b> 格 ＝ 直走 ${a.toFixed(3)} 格 ＋ 斜走 ${b.toFixed(3)} 步 × √2</div>` +
+                `<div class="dist-muted">同一路徑以斜走 ${DQ9AT_DIAG} 計：${(a + DQ9AT_DIAG * b).toFixed(3)}　｜　` +
+                `DQ9AT A*（方格中心、禁切角）：${fmt(state.dq9at[id], 1)}</div>`;
         }
 
         // In-tile position: bottom-left of the tile is (0, 0), centre is (0.5, 0.5)
@@ -266,7 +309,7 @@
                 const cid = a.key + '>' + b.key;
                 if (a.key === b.key) return `<td class="dist-self">–</td>`;
                 const cls = cid === id ? 'pick sel' : 'pick';
-                const tip = `直走 ${state.straight[cid].toFixed(3)} ＋ 斜走 ${state.diag[cid].toFixed(3)} 步`;
+                const tip = `直走 ${state.straight[cid].toFixed(3)} ＋ 斜走 ${state.diag[cid].toFixed(3)} 步｜DQ9AT A*：${fmt(state.dq9at[cid], 1)}`;
                 return `<td class="${cls}" data-from="${a.key}" data-to="${b.key}" title="${tip}">${fmt(state.dist[cid], 2)}</td>`;
             }).join("");
             return `<tr><th style="color:${a.color}">${a.label}</th>${cells}</tr>`;
@@ -306,7 +349,7 @@
                 <label for="distTo">終點</label><select id="distTo"></select>
             </div>
             <div id="distResult"></div>
-            <div class="dist-note">1 斜走步＝x、y 各走 1 格邊長</div>
+            <div class="dist-note">1 斜走步＝x、y 各走 1 格邊長。兩工具只有方格邊長 1:1 對齊；DQ9AT 的斜走 1.5、禁切角、方格中心是另一套規則，僅並列參考。</div>
             <div class="dist-row dist-tables">
                 <table class="dist-table" id="distTable"></table>
                 <div>
@@ -338,5 +381,5 @@
     document.getElementById('floor').addEventListener('input', update);
     update();
 
-    window.DQ9Distance = { getState: () => state, segmentClear, octile };
+    window.DQ9Distance = { getState: () => state, segmentClear, octile, dq9atStepCost };
 })();
