@@ -506,7 +506,7 @@
                 ${cell('Location', 'srchLocation', '<input type="text" class="srch-hex" id="srchLocation" maxlength="2" placeholder="96">')}
                 ${cell('Base Quality', 'srchBq', num('srchBq', 2, 248))}
                 ${cell('BOSS', 'srchBoss', sel('srchBoss', named(C.BOSS_NAMES, 0, 2)))}
-                ${cell('Sp.Floor (ElistOfs)', 'srchElist', sel('srchElist', ELIST_OPTIONS))}
+                ${cell('Sp.Floor', 'srchElist', sel('srchElist', ELIST_OPTIONS))}
                 ${cell('ONLY Monster', 'srchOnlyMon', sel('srchOnlyMon', onlyMon))}
             </div>
             <div class="srch-boxes">${boxes.join('')}</div>
