@@ -48,23 +48,28 @@
                     .concat(tkg.calculateChestCoords(hex, floor1, envName).map((c, i) => pt(c, chestTiles[i]))),
                 tiles: [ctx.upStairs, ctx.downStairs].concat(chestTiles),
                 context: ctx,
-                starts: st.up && ctx.upStairs ? { 0: walk.upStairsStart(st.up, ctx.upStairs, tkg.grid) } : null,
+                stairs: [[0, true, st.up, ctx.upStairs], [1, false, st.down, ctx.downStairs]]
+                    .filter(([, , c, tile]) => c && tile).map(([k, up, c, tile]) => ({ k, up, shape: walk.stairsShape(c, tile, tkg.grid) })),
                 info: { grid: tkg.grid, width: tkg.width, height: tkg.height, bitfield: tkg.bitfield, env: tkg.envIndices[envName] },
             };
         }
 
-        const LB_SLACK = 2 * (0.5 + (Math.SQRT2 - 1) * 0.5) / 16;
+        const LB_SLACK = 2 * (0.5 + (Math.SQRT2 - 1) * 0.5) / 8;
+        const upFront = fd => {
+            const s = fd.stairs.find(s => s.up);
+            return s && { x: (s.shape.front[0][0] + s.shape.front[1][0] + 1) / 2 * 0x1000, y: (s.shape.front[0][1] + s.shape.front[1][1] + 1) / 2 * 0x1000 };
+        };
         function costRow(fd, i, exact) {
             const row = fd.points.map(() => Infinity);
             if (fd.points[i]) {
                 const cols = fd.points.flatMap((p, j) => p ? [j] : []);
                 if (exact) {
                     walk.setFloor(fd.info);
-                    const d = walk.gridFrom(fd.points, i, [0, 1], fd.starts);
+                    const d = walk.gridFrom(fd.points, i, fd.stairs);
                     for (const j of cols) row[j] = d[j];
                 } else {
                     tileWalk.setFloorTiles(fd.info);
-                    const valid = fd.points.map((p, j) => (fd.starts && fd.starts[j] && j === i) || p || { x: 0, y: 0 });
+                    const valid = fd.points.map((p, j) => (j === i && j === 0 && upFront(fd)) || p || { x: 0, y: 0 });
                     const d = tileWalk.shortest(valid, i, cols);
                     for (const j of cols) row[j] = j === i ? 0 : Math.max(0, d[j] - LB_SLACK);
                 }

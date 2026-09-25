@@ -70,13 +70,15 @@
         walk.setFloor({ grid: mapGrid, width: mapWidth, height: mapHeight, bitfield: bitfieldGrid,
                         env: envIndices[getEnvironment(mapContext.field_0.mapseed)] });
         const points = collectPoints();
-        const stairs = points.map((p, k) => (p.key === 'up' || p.key === 'down') ? k : -1).filter(k => k >= 0);
-        const up = points.findIndex(p => p.key === 'up');
-        const starts = up >= 0 ? { [up]: walk.upStairsStart(mapContext.stairsCoords.up, mapContext.upStairs, mapGrid) } : null;
+        const stairs = ['up', 'down'].flatMap(key => {
+            const k = points.findIndex(p => p.key === key);
+            const tile = key === 'up' ? mapContext.upStairs : mapContext.downStairs;
+            return k < 0 ? [] : [{ k, up: key === 'up', shape: walk.stairsShape(mapContext.stairsCoords[key], tile, mapGrid) }];
+        });
 
         const dist = {}, dq9at = {};
         points.forEach((a, i) => {
-            const d = walk.gridFrom(points, i, stairs, starts);
+            const d = walk.gridFrom(points, i, stairs);
             points.forEach((b, j) => {
                 const id = a.key + '>' + b.key;
                 dist[id] = d[j];
@@ -88,7 +90,7 @@
         const path = id => {
             if (!(id in paths)) {
                 const [f, t] = id.split('>'), i = points.findIndex(p => p.key === f), j = points.findIndex(p => p.key === t);
-                paths[id] = (i < 0 || j < 0 || i === j) ? [] : walk.gridPath(points, i, j, stairs, starts);
+                paths[id] = (i < 0 || j < 0 || i === j) ? [] : walk.gridPath(points, i, j, stairs);
             }
             return paths[id];
         };
@@ -97,10 +99,10 @@
     }
 
     function split(len) {
-        const steps = len * 16;
+        const steps = len * 8;
         for (let b = 0; b * Math.SQRT2 <= steps + 1e-9; b++) {
             const a = steps - b * Math.SQRT2;
-            if (Math.abs(a - Math.round(a)) < 1e-6) return [Math.round(a) / 16, b / 16];
+            if (Math.abs(a - Math.round(a)) < 1e-6) return [Math.round(a) / 8, b / 8];
         }
         return [NaN, NaN];
     }
@@ -230,7 +232,7 @@
         panel.className = "panel dist-panel";
         panel.innerHTML = `
             <div class="dist-row">
-                <b>Ideal Walk</b><span class="tip" tabindex="0" data-tip="Horizontal / vertical / 45° steps between 1/16-tile cells, no diagonal past a wall cell, never stepping on the up or down stairs. Unit = one tile edge; 1 diagonal step = one tile edge on both x and y. From / To or a table cell picks the pair to draw; None or a – cell hides it. A search route stays until a single pair is picked.">ⓘ</span>
+                <b>Ideal Walk</b><span class="tip" tabindex="0" data-tip="Horizontal / vertical / 45° steps between 2×2px cells (1/8 tile, the character), no diagonal past a wall cell, never stepping on the up or down stairs (2px wide, 4px deep). Walks from the up stairs leave from the 2 cells in front of it. Unit = one tile edge; 1 diagonal step = one tile edge on both x and y. From / To or a table cell picks the pair to draw; None or a – cell hides it. A search route stays until a single pair is picked.">ⓘ</span>
             </div>
             <div class="dist-row">
                 <label for="distFrom">From</label><select id="distFrom"></select>
