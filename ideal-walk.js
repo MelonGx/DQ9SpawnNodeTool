@@ -281,7 +281,7 @@ function createIdealWalk(px = 16, tkg) {
         return mask;
     }
 
-    const otherStairs = (points, stairs, src, dst, starts) =>
+    const stairsToAvoid = (points, stairs, src, dst, starts) =>
         stairs.filter(k => (k !== src || (starts && starts[k])) && k !== dst && points[k]);
 
     function upStairsStart(fine, tile, grid) {
@@ -343,7 +343,7 @@ function createIdealWalk(px = 16, tkg) {
         const groups = new Map();
         points.forEach((p, j) => {
             if (!p) return;
-            const avoid = otherStairs(points, stairs, src, j, starts), key = avoid.join(',');
+            const avoid = stairsToAvoid(points, stairs, src, j, starts), key = avoid.join(',');
             if (!groups.has(key)) groups.set(key, { avoid, targets: [] });
             groups.get(key).targets.push(j);
         });
@@ -357,7 +357,7 @@ function createIdealWalk(px = 16, tkg) {
     const DIRS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
     function gridPath(points, src, dst, stairs, starts) {
         const W = freeW, N = W * freeH;
-        const blocked = stairsCells(points, otherStairs(points, stairs, src, dst, starts));
+        const blocked = stairsCells(points, stairsToAvoid(points, stairs, src, dst, starts));
         const open = (x, y) => isFree(x, y) && !(blocked && blocked[y * W + x]);
         const nearWall = (x, y) => {
             for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) if ((ox || oy) && !isFree(x + ox, y + oy)) return 1;
