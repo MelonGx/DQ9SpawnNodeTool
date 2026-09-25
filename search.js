@@ -1,10 +1,3 @@
-// Ideal Walk Search: DQ9AT's Ultimate Search (Fastest Map / Fastest Floor) and Chest Timer Search
-// (D / 5D / 9D), ranked by the ideal walk (ideal-walk.js) instead of DQ9AT's step count.
-// Map details, conditions and chest routes come from DQ9AT's core (dq9at-core.js); floor layouts and
-// exact stairs / chest positions come from TKG's own generator (the inline script of index.html).
-//   Fastest Map  : entrance -> boss floor, every floor up stairs -> down stairs (top 50)
-//   Fastest Floor: with Sp.Floor (ElistOfs) / ONLY Monster, up to the floor before the special floor
-//   Chest Timer  : DQ9AT's QL / Combo / 3rd routes; only their walking cost is the ideal walk
 (function () {
     const ELIST_OPTIONS = [
         ['MULTI_SPECIAL', 'Multi-Special-Floor'], ['SIZE_15', '15×15'], ['PARTIAL_NONE', 'Partially No-enemy'],
@@ -32,18 +25,13 @@
         B08: 'Unable to match this Rank. Skipped.',
     };
 
-    // ---------------------------------------------------------------------------------------------
-    // Search runtime. Runs inside a Worker (or on the main thread as a fallback); everything it
-    // needs is in the Worker source: DQ9AT_CORE, createIdealWalk and TKG_GEN.
     function searchRuntime(self) {
         const tkg = TKG_GEN();
         const walk = createIdealWalk(16, tkg);
-        const tileWalk = createIdealWalk(1, tkg);    // lower bound: whole walkable tiles
-        // TKG's in-tile offsets (modifiers / exceptions; x and z use the same values)
+        const tileWalk = createIdealWalk(1, tkg);
         const offsets = [...new Set(tkg.modifiers.concat(Object.values(tkg.exceptions)).map(m => m.x))];
         let cancelled = false;
 
-        // TKG floor: exact positions of [up, down, chest 0, ...] and their tiles. floor1 is 1-based.
         function genFloor(seed, floor1) {
             tkg.generate(seed, floor1);
             const ctx = tkg.context, hex = ctx.field_0.mapseed;
@@ -64,9 +52,6 @@
             };
         }
 
-        // Costs from points[i] to every point of the floor ([up, down, chests...]).
-        // exact: the ideal walk; otherwise a lower bound of it: the continuous distance on whole
-        // walkable tiles, less the largest offset of the start and end from their cells' centres.
         const LB_SLACK = 2 * (0.5 + (Math.SQRT2 - 1) * 0.5) / 16;
         function costRow(fd, i, exact) {
             const row = fd.points.map(() => Infinity);
@@ -86,8 +71,6 @@
             return row;
         }
 
-        // Per-seed cache: floor layouts are the same for every Rank of a seed (the DQ9AT core reads
-        // its floors from here too)
         let cacheSeed = -1, floorCache = [];
         function floorEntry(seed, f) {
             if (seed !== cacheSeed) { cacheSeed = seed; floorCache = []; }
@@ -101,7 +84,6 @@
         const tilesOf = (seed, f) => floorEntry(seed, f).fd.tiles;
         const floorOf = (seed, index1) => floorEntry(seed, index1 - 1).fd;
 
-        // DQ9AT's walking cost, answered with the ideal walk (null = unreachable)
         function idealPointWalkCost(eng, f, sx, sy, gx, gy) {
             if (sx === gx && sy === gy) return 0;
             const tiles = tilesOf(eng.seed, f);
@@ -113,24 +95,20 @@
         }
         const C = DQ9AT_CORE({ tkg, floor: floorOf, calcPointWalkCost: idealPointWalkCost });
 
-        // ---- Fastest Map / Fastest Floor (DQ9AT SEED_PROCESSORS.fastest, with pruning) ----
         function fastestHit(eng, job, seed, r) {
             const conds = job.conds;
             if (!C.checkUltimateCondsMatch(eng, seed, r.key, conds, job.searchFilterLoc)) return null;
-            // DQ9AT: Greygnarl maps are left out of Fastest Map unless asked for
             if (job.mode === 'map' && eng.boss === 12 && parseInt(conds.boss) !== 12) return null;
             if (!C.checkOnlyMonPossible(eng, conds)) return null;
             eng.loadFloors();
             if (!C.chestCondsMatch(eng, conds)) return null;
             const er = C.checkElistAndD(eng, conds, job.searchOnlyWithD, job.onlyMonStr);
             if (!er.match) return null;
-            // Floors walked: map mode all floors; floor mode up to the floor before the special floor
             let limit = eng.floorCount;
             if (job.mode === 'floor' && er.jumpToFloor !== -1) limit = Math.min(er.jumpToFloor, limit);
             return { limit };
         }
 
-        // Exact sum of up -> down over floors 0..limit-1, or null if it cannot beat `bound`
         function fastestCost(seed, limit, bound) {
             const lb = [];
             let rest = 0;
@@ -149,7 +127,6 @@
             return { cost: sum, per };
         }
 
-        // ---- Chest Timer Search (DQ9AT SEED_PROCESSORS.item, D / 5D / 9D) ----
         const plain = html => String(html || '').replace(/<br\s*\/?>/gi, ' / ').replace(/<[^>]*>/g, '')
             .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
         function itemRows(eng, job, seed, r) {
@@ -214,8 +191,6 @@
             self.postMessage({ type: 'done', processed, total, hits, items: top, cancelled });
         }
 
-        // ---- Route of one result, floor by floor ----
-        // Re-run the result's checker, keeping every route DQ9AT evaluated (onRoute), and pick the walked one
         let captured = [];
         const CR = DQ9AT_CORE({ tkg, floor: floorOf, calcPointWalkCost: idealPointWalkCost, onRoute: w => captured.push(w) });
         function routeOf(job, item) {
@@ -237,7 +212,6 @@
                 };
                 legs = pick.legs.map(l => ({ f: l.f, from: key(l.f, l.from), to: key(l.f, l.to) }));
             }
-            // Floor visits in walking order, with each visit's cost
             const index = k => k === 'up' ? 0 : k === 'down' ? 1 : 2 + Number(k.slice(1));
             const visits = [];
             for (const l of legs) {
@@ -259,9 +233,6 @@
             }
         };
     }
-
-    // ---------------------------------------------------------------------------------------------
-    // Workers
 
     function tkgGeneratorSource() {
         const script = [...document.scripts].find(s => !s.src && s.textContent.includes('function FUN_02090444('));
@@ -286,7 +257,6 @@
         return runtimeSource;
     }
 
-    // A Worker, or the same runtime on the main thread if Workers are unavailable
     function startRuntime(onMessage) {
         const src = getRuntimeSource();
         try {
@@ -301,8 +271,6 @@
         }
     }
 
-    // job: { kind: 'fastest' | 'item', mode?, params?, conds, ranks, startSeed, endSeed, searchFilterLoc,
-    //        searchOnlyWithD?, topN }; resolves to { items, processed, hits }
     function runJob(job, onProgress) {
         const nWorkers = Math.max(1, Math.min(8, (navigator.hardwareConcurrency || 2) - 1));
         const span = job.endSeed - job.startSeed + 1;
@@ -337,10 +305,6 @@
         return { promise, cancel: () => runtimes.forEach(r => r.post({ type: 'cancel' })) };
     }
 
-    // ---------------------------------------------------------------------------------------------
-    // Search setup (DQ9AT main-thread logic: startFastestSearch, QuickloadSearch, NineSearch,
-    // TKSearch, JFireSearch, ThirdChestSearch), reading this panel instead of DQ9AT's form
-
     let core = null;
     function getCore() { return core || (core = DQ9AT_CORE()); }
     const val = id => document.getElementById(id).value.trim();
@@ -360,7 +324,6 @@
         return conds;
     }
 
-    // Seed range and Ranks as DQ9AT's executeSharedSearch; returns null (after a message) if nothing to run
     function baseJob(conds, filterRanks) {
         const C = getCore();
         const loc = C.parseLocationCode(conds.location), bq = C.parseBaseQuality(conds.bq);
@@ -392,7 +355,6 @@
         return Object.assign(job, { kind: 'fastest', mode, searchOnlyWithD: checked('srchOnlyWithD'), topN: mode === 'floor' ? Infinity : 50 });
     }
 
-    // Chest Timer Search, D / 5D / 9D: DQ9AT's A* presets (all hits, sorted by the route cost)
     const qlSec = () => ({ D: null, '5D': 0, '9D': 4 })[val('srchQlMode')];
     const itemGroup = () => { const o = document.getElementById('srchItem').selectedOptions[0]; return o ? o.parentElement.dataset.group : ''; };
     function itemJob(checker, filterRanks, params, preset) {
@@ -457,7 +419,6 @@
                        { targetFloors, checkItems, isS3, chestRanks, wantAstar: true });
     }
 
-    // DQ9AT's result shaping for the A* presets: B10F extra rows keep only the best 5, x3 hits last
     function shapeItems(items, preset) {
         let arr = items;
         if (preset.b9Rows) arr = arr.filter(it => !it.isB10).concat(arr.filter(it => it.isB10).slice(0, 5));
@@ -469,9 +430,6 @@
         }
         return arr;
     }
-
-    // ---------------------------------------------------------------------------------------------
-    // Panel (TKG style)
 
     function setStatus(text) { document.getElementById("srchStatus").textContent = text; }
 
@@ -516,7 +474,6 @@
         const cell = (label, id, html) => `<div class="srch-cell"><label for="${id}">${label}</label>${html}</div>`;
         const num = (id, min, max) => `<input type="number" id="${id}" min="${min}" max="${max}">`;
 
-        // ONLY Monster list in DQ9AT's order
         const onlyMon = [], seen = new Set(['0B5', '01B', '0B9']);
         const monOpt = id => [C.MONSTER_DB[id].en, `${C.MONSTER_DB[id].en} ${C.MONSTER_DB[id].jp}`];
         ['0B5', '01B', '0B9'].forEach(id => onlyMon.push(monOpt(id)));
@@ -617,9 +574,6 @@
         });
     }
 
-    // ---------------------------------------------------------------------------------------------
-    // Route of a result: floor visits in walking order; a visit shows its route on the map
-
     let shown = null, routeRt = null, routeSeq = 0;
     const routeWaiting = new Map();
     function requestRoute(job, item) {
@@ -654,7 +608,6 @@
                 return `<span class="srch-stop" data-seed="${seedHex}" data-floor="${v.f + 1}" data-legs='${JSON.stringify(v.legs)}'>` +
                        `B${v.f + 1}F ${stops} ${v.cost.toFixed(2)}</span>`;
             }).join(' ') + ` <span class="srch-note">= ${route.cost.toFixed(3)}</span>`;
-            // show the last floor visited (the target)
             const stopsEls = cell.querySelectorAll('.srch-stop');
             if (stopsEls.length) showStop(stopsEls[stopsEls.length - 1]);
         }).catch(err => { cell.textContent = 'Route error: ' + err.message; });
@@ -663,7 +616,6 @@
         document.querySelectorAll('.srch-stop.on').forEach(s => s.classList.remove('on'));
         el.classList.add('on');
         window.DQ9Distance.showRoute(el.dataset.seed, Number(el.dataset.floor), JSON.parse(el.dataset.legs));
-        // phones: an unpinned map is off screen, bring it back
         const map = document.querySelector('.app.stacked .app-map.unpinned');
         if (map) map.scrollIntoView({ behavior: 'smooth' });
     }
@@ -687,7 +639,6 @@
         let n = 0;
         const rows = items.map((it, i) => {
             if (it.header) return `<tr><td colspan="7" class="srch-left"><b>${it.header}</b></td></tr>`;
-            // DQ9AT's route alternatives (e.g. forward / reverse), in its own 1-decimal format
             const routes = it.astarText !== undefined ? ` (routes ${it.astarText})` : '';
             return `<tr class="srch-pick" data-i="${i}" data-seed="${hex4(it.seed)}" title="Show the route">` +
                    `<td>${++n}</td><td>${hex4(it.seed)}</td><td>${it.rStr}</td><td class="srch-left">${it.name}</td><td>${it.fc}</td>` +

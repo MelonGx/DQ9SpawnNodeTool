@@ -1,9 +1,7 @@
-// Two-column layout: the map on the left stays in view (sticky) while the controls and results on
-// the right scroll; on narrow screens (phones) everything stacks and the map stays pinned on top.
 (function () {
-    const SIDE_MIN = 440, GAP = 16;          // side column minimum, column gap
-    const SIDE_MIN_SHORT = 340;              // side column minimum on short screens (phone landscape)
-    const STACK_SIDE_MIN = 300;              // stacked: height kept free below the pinned map
+    const SIDE_MIN = 440, GAP = 16;
+    const SIDE_MIN_SHORT = 340;
+    const STACK_SIDE_MIN = 300;
 
     const style = document.createElement("style");
     style.textContent = `
@@ -45,7 +43,6 @@
     app.append(mapCol, side);
     mapCol.append(grid);
 
-    // Stacked: the pinned map can be released to give the controls the whole screen
     const pin = document.createElement("button");
     pin.className = "map-pin";
     pin.type = "button";
@@ -56,14 +53,12 @@
     });
     mapCol.append(pin);
 
-    // Stable viewport height (iOS Safari's toolbar changes innerHeight while scrolling)
     const probe = document.createElement("div");
     probe.style.cssText = "position:fixed;left:0;top:0;width:0;height:100vh;height:100svh;visibility:hidden;pointer-events:none";
     document.body.append(probe);
     const viewH = () => probe.getBoundingClientRect().height || window.innerHeight;
     document.querySelectorAll("body > .panel").forEach(p => side.append(p));
 
-    // Results table scrolls sideways inside the column instead of widening it
     const results = document.getElementById("srchResults");
     if (results) {
         const wrap = document.createElement("div");
@@ -72,13 +67,11 @@
         wrap.append(results);
     }
 
-    // Map size: as large as fits next to the side column and within the window height;
-    // stacked, it leaves room below the pinned map for the controls
     window.mapDisplaySize = () => {
         const cs = getComputedStyle(document.body);
         const w = document.documentElement.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
         const h = viewH();
-        const short = h < 500 && w - SIDE_MIN_SHORT - GAP >= h - 20;   // phone landscape
+        const short = h < 500 && w - SIDE_MIN_SHORT - GAP >= h - 20;
         const twoCols = w - SIDE_MIN - GAP >= 480 || short;
         app.classList.toggle("stacked", !twoCols);
         if (!twoCols) return Math.max(200, Math.min(w, 1024, h - STACK_SIDE_MIN));

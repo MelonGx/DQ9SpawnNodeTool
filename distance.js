@@ -1,5 +1,3 @@
-// Ideal-walk panel: shortest walking distance between the stairs and chests of the current floor,
-// computed by ideal-walk.js on TKG's rendered terrain, with the path drawn on the map.
 (function () {
     const walk = createIdealWalk(16, { TILE_WALL, TILE_DIVIDER, tileMap });
     const TILE = walk.TILE;
@@ -7,16 +5,12 @@
     const SVG_NS = "http://www.w3.org/2000/svg";
     const PATH_COLOR = "#ff00ff";
 
-    let state = null;               // { points, dist, dq9at, path(id) }
+    let state = null;
     let sel = { from: 'up', to: 'down' };
-    let route = null;               // { seed, floor, legs: [[fromKey, toKey], ...] } from the search
+    let route = null;
 
-    // TKG's tile read (FUN_02092934: -1 off the map)
     const isWalkableTile = (tx, ty) => ![TILE_WALL, TILE_DIVIDER, -1].includes(FUN_02092934(mapContext, tx, ty));
 
-    // DQ9AT's calcPointWalkCost, for side-by-side display (not an equivalent of the distance above):
-    // A* between tile centres, orthogonal step 1, diagonal step 1.5, diagonal only when both
-    // orthogonal neighbours are walkable (no corner cutting). Only the tile edge is shared with our model.
     const DQ9AT_DIAG = 1.5;
     function dq9atStepCost(sx, sy, tx, ty) {
         const w = mapWidth, h = mapHeight;
@@ -57,7 +51,6 @@
     function collectPoints() {
         const pts = [];
         const sc = mapContext.stairsCoords || {};
-        // TKG's in-tile offsets (modifiers / exceptions; x and z use the same values)
         const offsets = [...new Set(modifiers.concat(Object.values(exceptions)).map(m => m.x))];
         const add = (key, label, name, color, c, tile) => {
             if (!c || !tile) return;
@@ -89,7 +82,6 @@
             });
         });
 
-        // Paths are only worked out when drawn (walk.gridPath picks the plainest shortest walk)
         const paths = {};
         const path = id => {
             if (!(id in paths)) {
@@ -102,8 +94,6 @@
         state = { points, dist, dq9at, path };
     }
 
-    // Tiles walked straight / diagonal steps (1 tile on both axes) of a length: a + b * sqrt2 steps of
-    // 1/16 tile has only one integer split, so it follows from the length itself
     function split(len) {
         const steps = len * 16;
         for (let b = 0; b * Math.SQRT2 <= steps + 1e-9; b++) {
@@ -117,7 +107,6 @@
         return `straight ${a.toFixed(3)} + diagonal ${b.toFixed(3)} steps`;
     };
 
-    // walks: list of point lists, one polyline each
     function drawPath(walks) {
         const topOverlay = document.getElementById("topOverlay");
         const old = document.getElementById("distPath");
@@ -139,11 +128,9 @@
                 g.appendChild(line);
             }
         });
-        // Below the stairs/chest markers
         topOverlay.insertBefore(g, topOverlay.firstChild);
     }
 
-    // The search route, if it belongs to the floor on screen
     function activeRoute() {
         const m = mapContext && mapContext.field_0;
         return route && m && m.mapseed === route.seed && Number(m.floor) === route.floor ? route : null;
@@ -167,7 +154,6 @@
 
         const pts = state.points;
         const keys = pts.map(p => p.key);
-        // '' = None: no pair picked, no route drawn
         if (sel.from && !keys.includes(sel.from)) sel.from = 'up';
         if (sel.to && !keys.includes(sel.to)) sel.to = 'down';
 
@@ -188,7 +174,6 @@
                 `<div class="dist-muted">DQ9AT A* (tile centres, no corner cutting): ${fmt(state.dq9at[id], 1)}</div>`;
         }
 
-        // In-tile position: bottom-left of the tile is (0, 0), centre is (0.5, 0.5)
         const posRows = pts.map(p => {
             const inX = p.x / TILE - p.tx, inY = 1 - (p.y / TILE - p.ty);
             return `<tr><th style="color:${p.color}">${p.label}</th><td class="dist-name">${p.name}</td>` +
@@ -200,7 +185,6 @@
         const rows = pts.map(a => {
             const cells = pts.map(b => {
                 const cid = a.key + '>' + b.key;
-                // same point: picks None (no route drawn)
                 if (a.key === b.key) return `<td class="pick dist-self" data-from="" data-to="" title="No route">–</td>`;
                 const cls = cid === id ? 'pick sel' : 'pick';
                 const tip = `${splitText(state.dist[cid])} | DQ9AT A*: ${fmt(state.dq9at[cid], 1)}`;
@@ -281,12 +265,10 @@
     }
 
     buildPanel();
-    // Registered after the main script's listeners, so run() has already rebuilt the map
     document.getElementById('mapSeed').addEventListener('input', update);
     document.getElementById('floor').addEventListener('input', update);
     update();
 
-    // Show a search result's route on one floor: legs [[fromKey, toKey], ...] ('up', 'down', 'c0', ...)
     function showRoute(seedHex, floor1, legs) {
         route = { seed: seedHex.toUpperCase().padStart(4, '0'), floor: floor1, legs };
         document.getElementById('mapSeed').value = route.seed;

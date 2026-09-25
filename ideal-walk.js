@@ -1,27 +1,10 @@
-// Ideal walk: shortest walking distance on TKG's rendered terrain.
-//
-// The walkable area is measured on TKG's rendered map: every tile sprite is 16x16 pixels, and a
-// pixel is floor or wall according to the terrain's wall line (see setFloor). The ideal walk moves
-// from pixel cell to pixel cell in 8 directions (horizontal, vertical, 45 degrees): a straight step
-// is 1/16 tile, a diagonal step sqrt2/16, and a diagonal step is only allowed when both cells beside
-// it are floor (no diagonal past a wall cell). A position walks from the cell it lies in; positions
-// are fx32 (one tile = 0x8000). Distances are in tiles (one tile edge = 1). See gridShortest.
-// Stairs are only stepped on as a leg's own start or end: a leg never enters the detail cells of any
-// other stairs on the floor (TKG's 2x2 fine-unit stairs box). See gridFrom.
-//
-// No DOM or TKG globals are used, so the same source runs in the page and in search Workers; TKG's
-// tile types and sprite map come in as tkg: { TILE_WALL, TILE_DIVIDER, tileMap }.
-//
-// The continuous geometry below (visibility graph, shortest) is used with createIdealWalk(1) on
-// whole walkable tiles (setFloorTiles) as the search's lower bound: every floor pixel lies in a
-// walkable tile, so that distance, less the start / end cells' offsets, never exceeds the ideal walk.
 function createIdealWalk(px = 16, tkg) {
-    const TILE = 8 * 0x1000;        // one tile in fx32 (8 fine units of 0x1000)
-    const PX = px;                  // sprite pixels per tile edge
-    const CELL = TILE / PX;         // one sprite pixel in fx32
+    const TILE = 8 * 0x1000;
+    const PX = px;
+    const CELL = TILE / PX;
     const DIAG_EXTRA = Math.SQRT2 - 1;
 
-    let free = null;                // free[y * freeW + x]: floor pixel
+    let free = null;
     let freeW = 0, freeH = 0;
 
     function isFree(cx, cy) {
@@ -30,14 +13,12 @@ function createIdealWalk(px = 16, tkg) {
 
     const isWalkableTile = (grid, tx, ty) => grid[ty][tx] !== tkg.TILE_WALL && grid[ty][tx] !== tkg.TILE_DIVIDER;
 
-    // Steps of an 8-direction walk over dx, dy (straight 1, diagonal sqrt2)
     function octileSteps(dx, dy) {
         dx = Math.abs(dx); dy = Math.abs(dy);
         return Math.max(dx, dy) + DIAG_EXTRA * Math.min(dx, dy);
     }
     const octile = (dx, dy) => octileSteps(dx, dy) / TILE;
 
-    // Binary heap; less(a, b): a comes out first
     function makeHeap(less) {
         const heap = [];
         return {
@@ -72,15 +53,12 @@ function createIdealWalk(px = 16, tkg) {
     }
     const byKey = (a, b) => a[0] < b[0];
 
-    // Pixel corner (k, m) whose only two floor neighbours touch diagonally: zero-width, not passable
     function isPinch(k, m) {
         const nw = isFree(k - 1, m - 1), ne = isFree(k, m - 1);
         const sw = isFree(k - 1, m),     se = isFree(k, m);
         return (nw && se && !ne && !sw) || (ne && sw && !nw && !se);
     }
 
-    // Pixel corner with exactly one wall pixel around it: the only places a shortest path bends.
-    // Returns the direction (sx, sy) of that wall pixel, or null.
     function reflexWallDir(k, m) {
         const nw = !isFree(k - 1, m - 1), ne = !isFree(k, m - 1);
         const sw = !isFree(k - 1, m),     se = !isFree(k, m);
@@ -88,16 +66,12 @@ function createIdealWalk(px = 16, tkg) {
         return nw ? [-1, -1] : ne ? [1, -1] : sw ? [-1, 1] : [1, 1];
     }
 
-    // A shortest path can only bend at a reflex corner by wrapping around its wall pixel, so the
-    // line through the corner must not cut into that pixel's quadrant or the opposite one.
     function tangentAt(node, dx, dy) {
         if (!node.q) return true;
         const a = dx * node.q[0], b = dy * node.q[1];
         return !((a > 0 && b > 0) || (a < 0 && b < 0));
     }
 
-    // Segment lying on a pixel edge (x = line * CELL if vertical, else y = line * CELL), from a to b.
-    // Hugging a wall is fine, so a floor pixel on either side of each stretch is enough.
     function edgeRunClear(line, a, b, vertical) {
         const lo = Math.min(a, b), hi = Math.max(a, b);
         for (let c = Math.floor(lo / CELL); c * CELL < hi; c++) {
@@ -111,7 +85,6 @@ function createIdealWalk(px = 16, tkg) {
         return true;
     }
 
-    // Does the straight segment a -> b (integer fx32 coords) stay inside the walkable area?
     function segmentClear(a, b) {
         const dx = b.x - a.x, dy = b.y - a.y;
         if (dx === 0 && dy === 0) return true;
@@ -119,9 +92,6 @@ function createIdealWalk(px = 16, tkg) {
         if (dx === 0 && a.x % CELL === 0) return edgeRunClear(a.x / CELL, a.y, b.y, true);
         if (dy === 0 && a.y % CELL === 0) return edgeRunClear(a.y / CELL, a.x, b.x, false);
 
-        // Walk the pixels the segment passes through (grid traversal). Which pixel edge comes next
-        // is decided exactly with integer cross-multiplication; passing through a pixel corner
-        // steps diagonally and must not squeeze through a pinch.
         const sx = Math.sign(dx), sy = Math.sign(dy), adx = Math.abs(dx), ady = Math.abs(dy);
         const startCell = (v, d) => (d < 0 && v % CELL === 0) ? v / CELL - 1 : Math.floor(v / CELL);
         const endCell = (v, d) => (d > 0 && v % CELL === 0) ? v / CELL - 1 : Math.floor(v / CELL);
@@ -129,9 +99,8 @@ function createIdealWalk(px = 16, tkg) {
         const ex = endCell(b.x, dx), ey = endCell(b.y, dy);
         if (!isFree(cx, cy)) return false;
         while (cx !== ex || cy !== ey) {
-            const nx = sx > 0 ? (cx + 1) * CELL : cx * CELL;     // next vertical pixel edge
-            const ny = sy > 0 ? (cy + 1) * CELL : cy * CELL;     // next horizontal pixel edge
-            // compare (nx - a.x) / dx with (ny - a.y) / dy
+            const nx = sx > 0 ? (cx + 1) * CELL : cx * CELL;
+            const ny = sy > 0 ? (cy + 1) * CELL : cy * CELL;
             const tx = sx ? (nx - a.x) * sx * ady : Infinity;
             const ty = sy ? (ny - a.y) * sy * adx : Infinity;
             if (tx < ty) cx += sx;
@@ -145,7 +114,6 @@ function createIdealWalk(px = 16, tkg) {
         return true;
     }
 
-    // Sprite pixel classes per terrain (see TERRAIN): 0 transparent, 1 wall-line colour, 2 other
     const terrainCache = {};
     function spriteClasses(sprite, env) {
         const key = sprite + env;
@@ -163,11 +131,6 @@ function createIdealWalk(px = 16, tkg) {
         return terrainCache[key];
     }
 
-    // Floor pixels of TKG's rendered map. Wall = everything reachable from transparent pixels
-    // without crossing the terrain's wall line, plus the wall-line pixels touching it (the line
-    // itself is the wall's edge). Floor = the rest, as far as it connects to an open tile side;
-    // wall-line colours left inside the floor are just floor decoration.
-    // map: { grid (TKG mapGrid rows), width, height, bitfield (TKG bitfieldGrid rows), env (0-4) }
     function setFloor(map) {
         const { grid, width: mapWidth, height: mapHeight, bitfield: bitfieldGrid, env } = map;
         const W = mapWidth * PX, H = mapHeight * PX;
@@ -195,7 +158,6 @@ function createIdealWalk(px = 16, tkg) {
             const i = stack.pop(), x = i % W, y = (i / W) | 0;
             pushOuter(x + 1, y); pushOuter(x - 1, y); pushOuter(x, y + 1); pushOuter(x, y - 1);
         }
-        // Wall-line pixels 8-connected to the outer wall, and the rest of their line
         for (let i = 0; i < W * H; i++) {
             if (cls[i] !== 1 || wall[i]) continue;
             const x = i % W, y = (i / W) | 0;
@@ -217,7 +179,6 @@ function createIdealWalk(px = 16, tkg) {
             }
         }
 
-        // Floor continues into walkable neighbours, so grow it from the open sides of walkable tiles
         const floor = new Uint8Array(W * H);
         const pushFloor = (x, y) => {
             const i = y * W + x;
@@ -244,7 +205,6 @@ function createIdealWalk(px = 16, tkg) {
         corners = null;
     }
 
-    // Whole walkable tiles as the floor (createIdealWalk(1) only)
     function setFloorTiles(map) {
         const { grid, width, height } = map;
         free = new Uint8Array(width * height);
@@ -255,7 +215,6 @@ function createIdealWalk(px = 16, tkg) {
         corners = null;
     }
 
-    // Reflex corners of the current floor, found once per setFloor()
     let corners = null;
     function floorCorners() {
         if (!corners) {
@@ -270,11 +229,6 @@ function createIdealWalk(px = 16, tkg) {
         return corners;
     }
 
-    // Shortest distances from points[src] to points[targets] ({ x, y } in fx32) on the current floor.
-    // A* over the visibility graph of the reflex corners plus the points, with edges found only
-    // from expanded nodes; the heuristic (octile distance to the nearest unfinished target) is
-    // admissible and consistent, so every target's distance is exact.
-    // Returns dist by node; points are nodes 0..points.length-1.
     function shortest(points, src, targets) {
         const nodes = points.map(p => ({ x: p.x, y: p.y, q: null })).concat(floorCorners());
         const n = nodes.length;
@@ -293,7 +247,6 @@ function createIdealWalk(px = 16, tkg) {
             if (closed[u]) continue;
             closed[u] = 1;
             if (left.delete(u)) {
-                // the heuristic changed: re-key the open nodes
                 for (const [, v] of heap.drain()) if (!closed[v]) heap.push([g[v] + h(v), v]);
                 continue;
             }
@@ -312,11 +265,8 @@ function createIdealWalk(px = 16, tkg) {
         return g;
     }
 
-    // ---- The ideal walk: 8-direction steps between floor cells, no diagonal past a wall cell ----
     const cellOf = p => Math.floor(p.y / CELL) * freeW + Math.floor(p.x / CELL);
 
-    // Cells a leg must not enter: the detail cells of the stairs points[avoid[k]], i.e. TKG's stairs
-    // box, 2x2 fine units (1/8 tile) around the fine position p >> 12 (4x4 pixel cells). null if none.
     function stairsCells(points, avoid) {
         if (!avoid.length) return null;
         const mask = new Uint8Array(freeW * freeH), per = 0x1000 / CELL;
@@ -331,11 +281,8 @@ function createIdealWalk(px = 16, tkg) {
         return mask;
     }
 
-    // Stairs a leg from points[src] to points[dst] avoids: all but its own ends
     const otherStairs = (points, stairs, src, dst) => stairs.filter(k => k !== src && k !== dst && points[k]);
 
-    // Shortest distances (in tiles) from points[src] to points[targets], off the blocked cells:
-    // A* with the octile distance to the nearest unfinished target as heuristic
     function gridShortest(points, src, targets, blocked) {
         const W = freeW, H = freeH;
         const g = new Float64Array(W * H).fill(Infinity), closed = new Uint8Array(W * H);
@@ -355,7 +302,6 @@ function createIdealWalk(px = 16, tkg) {
             if (closed[u]) continue;
             closed[u] = 1;
             if (left.delete(u)) {
-                // the heuristic changed: re-key the open cells
                 for (const [, v] of heap.drain()) if (!closed[v]) heap.push([g[v] + h(v), v]);
                 if (!left.size) break;
             }
@@ -374,8 +320,6 @@ function createIdealWalk(px = 16, tkg) {
         return targets.map(t => g[cellOf(points[t])] / PX);
     }
 
-    // Ideal walk from points[src] to every point, where points[stairs[k]] are stairs: each leg avoids
-    // the other stairs' detail cells. Returns distances by point index (Infinity if none).
     function gridFrom(points, src, stairs) {
         const dist = points.map(() => Infinity);
         const groups = new Map();
@@ -392,12 +336,6 @@ function createIdealWalk(px = 16, tkg) {
         return dist;
     }
 
-    // The path drawn for one leg. Among all shortest walks (same numbers of straight and diagonal
-    // steps, so exactly the same length) it takes the one with the fewest turns, then the fewest steps
-    // onto cells next to a wall: A* over (cell, heading) with that lexicographic cost (the octile
-    // heuristic only on the length).
-    // stairs: point indices of stairs; the leg avoids those other than src / dst as in gridFrom.
-    // Returns cell-centre points, one per straight or 45-degree run, or [] if unreachable.
     const DIRS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
     function gridPath(points, src, dst, stairs) {
         const W = freeW, N = W * freeH;
@@ -408,7 +346,6 @@ function createIdealWalk(px = 16, tkg) {
             return 0;
         };
         const start = cellOf(points[src]), goal = cellOf(points[dst]);
-        // state = cell * 9 + heading (8 = none yet); cost = (straight, diagonal, turns, wall)
         const S = N * 9;
         const sa = new Int32Array(S).fill(-1), sb = new Int32Array(S), st = new Int32Array(S), sw = new Int32Array(S);
         const prev = new Int32Array(S).fill(-1), done = new Uint8Array(S);
@@ -419,7 +356,6 @@ function createIdealWalk(px = 16, tkg) {
         };
         const gx = goal % W, gy = (goal / W) | 0;
         const h = c => octileSteps(c % W - gx, ((c / W) | 0) - gy);
-        // heap entries: [f, turns, wall, a, b, state]; equal f (to rounding) falls back to turns, wall
         const heap = makeHeap((x, y) => Math.abs(x[0] - y[0]) > 1e-9 ? x[0] < y[0] : (x[1] - y[1] || x[2] - y[2]) < 0);
         if (free[start] !== 1) return [];
         const s0 = start * 9 + 8;
@@ -455,13 +391,6 @@ function createIdealWalk(px = 16, tkg) {
         });
     }
 
-    // TKG mapSprites.png as pixel classes, per sprite (TKG's tileMap: bitfield -> sprite) and terrain
-    // [caves, ruins, ice, water, fire]: two pixels per base-9 digit (3 * first + second), row-major,
-    // 0 = transparent, 1 = the terrain's wall-line colour, 2 = anything else. Wall-line colours:
-    //   caves 784010 885818 906820 a07028 b87038      ruins 784010 885818 906820 a07028 b87038 a08028 b08830
-    //   ice   784010 885818 906820                    water 784010 885818 906820 a07028
-    //   fire  f0c068 e0a840
-    // Sprites without data (00: solid wall) are fully transparent.
     var TERRAIN = {
             '01': ['88588758275887868758878827888786874887882758875688488758284888568878885828788856884887582848875688488758275887868758878827588756', '84588748745887757458874574888845748888554788874574888845748888457488884544888845745887447758884544888845745887457448877884488778', '87588788275887568758875824888846848888482488884687588848275887468758875828588786875887882858875687588788275887868758875827588786', '87588748285887568858874828588846885888782858887687588848245887468458874824888756858887882588878684888788245887568758875824588756', '58588787285887865858878727888486578885872788858657888487275887865858878728588776584888572878885658488857285888565858878728588786'],
             '02': ['66666666888888888888888858744557444584448888888888888888888888888888888888888888885444584544874474488874888888888888888866666666', '85887858444444444454444444444444458888745888888888888888888888888888888888888888788888884588884454444445444474444444444884458888', '66666666888888888744888874445785458744448888888888888888888888888888888888888888888888884584444444445544874888888888888866666666', '22222222888888885444588844844887458744448888888888888888888888888888888888888888888888884444587445844844888744478888888822222222', '11111111888888888888888888887445448448848745888888888888888888888888888888888888888884584587454484448888888888888888888811111111'],
@@ -511,9 +440,6 @@ function createIdealWalk(px = 16, tkg) {
             '33': ['88588888875888888748888845488888447888888458888888888888888888888888888888888888888888888888884488888747888887588888875888888788', '24448888745488884445888844488888475888885488888845888888588888888888888788888874888887478888845488888444888874448888774588884446', '88588888875888888848888858488888445888888888888888888888888888888888888888888888888888888888884488888857888887888888875888888788', '88588888885888888758888874588888448888888888888888888888888888888888888888888888888888888888884488888744888887588888875888888758', '28588888885888888758888887888888458888888888888888888888888888888888888888888888888888888888887488888848888887588888878888888786'],
     };
 
-    // Exact fx32 coordinate of a TKG marker from TKG's output: fine = (tile * 8 + 4) + (offset >> 12) for
-    // one of TKG's in-tile offsets (its modifiers / exceptions), and each offset rounds to a different
-    // fine step, so the offset follows from fine - (tile * 8 + 4). offsets: TKG's x (= z) offset values.
     function exactCoord(fine, tile, offsets) {
         const base = tile * 8 + 4, off = offsets.find(v => (v >> 12) === fine - base);
         return off === undefined ? null : base * 0x1000 + off;

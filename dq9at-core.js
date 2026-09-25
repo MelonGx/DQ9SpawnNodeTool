@@ -1,16 +1,4 @@
-// DQ9AT's search part, from MelonGx/DQ9AT DQ9AT.html @ bd4675a (<script id="dq9-core">): the game's
-// tables, ElistOfs, and the search conditions and checkers. The treasure map itself (TreasureMap: details
-// from Seed and Rank, chest Ranks, chest contents) is this tool's own code on those tables.
-// Everything TKG's generator already does is TKG's: the floors (layout, stairs, chests), the random
-// number generator (LCG), the Type (getEnvironment) and the tile types.
-// English text only; no Multibug, Anomaly, Base Quality count, AT / Free searches or result HTML.
-// Wrapped in a function so its globals do not clash with TKG's, and so search.js can hand the same
-// source to Web Workers.
-// overrides: { tkg } TKG's generator (TKG_GEN in search.js); { floor(seed, index1) } a TKG floor
-// ({ info: { grid, width, height }, context }); { calcPointWalkCost } the walking cost between two
-// points; { onRoute } receives every chest route a checker evaluates ({ cost, legs } or null).
 function DQ9AT_CORE(overrides) {
-// TKG's generator (TKG_GEN in search.js): LCG, getEnvironment / envIndices
 const tkg = overrides && overrides.tkg;
 const STR_SOLO='Solo';
 const STR_PARTY='Party';
@@ -27,12 +15,9 @@ const EL_ONLY=' only';
 
 const b3fThreeItems=["Mini medal","Sage's elixir","Iron nails","Hephaestus' flame"];
 
-// ===============================
-// DATA TABLES - from TreasureMapDataTable.cs
-// ===============================
 const MAP_RANK=[0x02,0x38,0x3D,0x4C,0x51,0x65,0x79,0x8D,0xA1,0xB5,0xC9,0xDD];
 const CHEST_RANK={10:'S',9:'A',8:'B',7:'C',6:'D',5:'E',4:'F',3:'G',2:'H',1:'I'};
-const ENV_OPTS=[['Caves','洞窟'],['Ruins','遺跡'],['Ice','氷'],['Water','水'],['Fire','火山']];   // [en, jp]
+const ENV_OPTS=[['Caves','洞窟'],['Ruins','遺跡'],['Ice','氷'],['Water','水'],['Fire','火山']];
 const ENV_NAMES=Object.fromEntries(ENV_OPTS.map((o,i)=>[i+1,o]));
 const BOSS_NAMES={
 1:['Equinox','馬','黒竜丸'],2:['Nemean','爪','ハヌマーン'],3:['Shogum','髭','スライムジェネラル'],4:['Trauminator','機','Sキラーマシン'],
@@ -109,19 +94,15 @@ const D_R=[
 ["Mimic","ミミック"], ["Cannibox","ひとくいばこ"]
 ];
 
-// One step of TKG's LCG, as its full 32-bit state
 function lcg(seed) {const r = new tkg.LCG(seed);r.next();return r.seed;}
 function atFromRng(rng) {return (rng >>> 16) & 0x7FFF;}
 
-// 四元組表 [inLo,inHi,outLo,outHi] 査列：找 v 落在哪一列，回傳該列的 [outLo,outHi]；無命中回傳 dft
-// 共用者：TreasureMap (rollInRow / rollBoss)、getRankSMRInfo (D_C/D_B/D_D)、sharedRankFilter (D_H/D_I)、jfire
 function row4(t,rows,v,dft) {
   for (let i=0;i<rows;i++) {const b=i*4;if (v>=t[b]&&v<=t[b+1]) return[t[b+2],t[b+3]];}
   return dft;
 }
-const NO_ROW=[1,0]; // row4 査無此列時的空範圍 (lo>hi，任何値都落不進去)
+const NO_ROW=[1,0];
 
-// Item in a chest of a Rank for a roll 0..99 (D_O / D_P / D_Q / D_R), [name, ...] or null
 function selectChestItem(rank, roll) {
   const start = D_O[rank-1], end = D_O[rank];
   let weight = 0;
@@ -132,36 +113,24 @@ function selectChestItem(rank, roll) {
   return null;
 }
 
-// ---- A treasure map: Seed + Rank ----
-// Floors (layout, stairs, chest spots) are TKG's (tkgFloor). What depends on the Rank is worked out here
-// from the game's tables: the map's details, the Rank of each chest and what a chest holds when opened
-// at a given second. Random numbers are TKG's LCG.
-
-// TKG's floor index1 (1-based) of a map seed, shared by every Rank of the seed:
-// { index, width, height, grid (TKG tile rows), up, down, spots: chest positions, cache }
 function tkgFloor(seed, index1) {
   const fd = overrides.floor(seed, index1);
   if (!fd.layout) {
     const ctx = fd.context, {grid, width, height} = fd.info;
     const spots = (ctx.field_0._chestCoords || []).slice(0, ctx.field_0.chestCount).map(c => ({x: c.x, y: c.y}));
-    // cache: values that depend on the layout alone (ElistOfs tile counts)
     fd.layout = {index: index1, width, height, grid, up: ctx.upStairs, down: ctx.downStairs, spots, cache: {}};
   }
   return fd.layout;
 }
 
 const randomFrom = seed => new tkg.LCG(seed >>> 0);
-// A value in [lo, hi]
 const rollBetween = (r, lo, hi) => lo + r.next() % (hi - lo + 1);
-// A value in the range a table gives for key (0, drawing nothing, if the table has no row for it)
 function rollInRow(r, table, rows, key) {
   const range = row4(table, rows, key, null);
   return range ? rollBetween(r, range[0], range[1]) : 0;
 }
-// 0..n-1 from a 15-bit draw, in the game's float arithmetic
 const rollScaled = (r, n) => (Math.fround(r.next() - 1) * n / 32767) >>> 0;
 
-// Boss of a Rank: the Rank's range of bosses, each weighted by D_E
 function rollBoss(r, rank) {
   const range = row4(D_D, 9, rank, null);
   if (!range) return 0;
@@ -176,25 +145,23 @@ function rollBoss(r, rank) {
   return 0;
 }
 
-// Rank of one chest (1 = I .. 10 = S) for a floor monster rank: within D_F's range for it
 function rollChestRank(r, floorMR) {
   const lo = D_F[(floorMR - 1) * 4 + 1], hi = D_F[(floorMR - 1) * 4 + 2];
   return lo + (Math.fround((hi - lo + 1) * Math.fround(r.next() - 1) / 32767) >>> 0);
 }
 
 class TreasureMap {
-  // Details, in the order the game draws them from the seed
   constructor(seed, rank) {
     Object.assign(this, {seed, rank, env: 0, floorCount: 0, smr: 0, boss: 0, prefix: 0, suffix: 0, lv: 0, locale: 0});
     this.floors = null;
     if (rank < 2 || rank > 248) return;
     const r = randomFrom(seed);
-    for (let i = 0; i < 13; i++) r.next();    // the 13th draw is the Type (TKG's getEnvironment)
+    for (let i = 0; i < 13; i++) r.next();
     this.env = tkg.envIndices[tkg.getEnvironment(seed.toString(16))] + 1;
     this.floorCount = rollInRow(r, D_B, 9, rank);
     this.smr = rollInRow(r, D_C, 8, rank);
     this.boss = rollBoss(r, rank);
-    for (let i = 0; i < 12; i++) r.next();    // drawn by the game here, not used
+    for (let i = 0; i < 12; i++) r.next();
     this.prefix = rollInRow(r, D_H, 5, this.smr);
     this.suffix = rollInRow(r, D_I, 4, this.boss);
     const area = rollInRow(r, D_G, 8, this.floorCount);
@@ -202,7 +169,6 @@ class TreasureMap {
     this.locale = LOCALE_INDEX[(area - 1) * 5 + this.env - 1];
   }
 
-  // Floors with their chests' Ranks; chestRankCounts[rank - 1]: chests of each Rank on the whole map
   loadFloors() {
     this.chestRankCounts = new Array(10).fill(0);
     this.floors = [];
@@ -221,7 +187,6 @@ class TreasureMap {
     }
   }
 
-  // What each chest of floor f holds when the floor is entered at second sec (item name or null)
   chestItems(f, sec) {
     const floor = this.floors[f], r = randomFrom(floor.index + this.seed + sec);
     return floor.chests.map(chest => {
@@ -237,11 +202,6 @@ class TreasureMap {
     return `${PREFIX_NAMES[this.prefix][0]} ${LOCALE_NAMES[this.locale][0]} of ${SUFFIX_NAMES[this.suffix][0]} Lv.${this.lv}`;
   }
 }
-
-// ========
-// Monster DB
-// ========
-// G 値實際由 G_VALUES 供値;g 刻意保留,供將來砍掉 G_VALUES 時以「Σ MONSTER_DB[hex].g over SPAWN_DB[env][mr] 全部條目(含寶箱怪)」等價替代
 
 const MONSTER_DB = {
   "008":{en:"Lost Soul",jp:"さまようたましい",g:20},
@@ -428,7 +388,6 @@ const MONSTER_DB = {
   "14B":{en:"Slugly Betsy",jp:"うみうしひめ",g:16},
   "14D":{en:"Hell's Gatekeeper",jp:"ヘルガーディアン",g:20},
   "14E":{en:"Wishmaster",jp:"ギリメカラ",g:12},
-  // Support monsters - no G value
   "025":{en:"Jinkster",jp:"ひとつめピエロ"},
   "032":{en:"Gum Shield",jp:"ビッグフェイス"},
   "04B":{en:"Slime Stack",jp:"スライムタワー"},
@@ -440,7 +399,6 @@ const MONSTER_DB = {
   "100":{en:"Crabid",jp:"ぐんたいガニ"},
 };
 
-// envType: 1=Caves, 2=Ruins, 3=Ice, 4=Water, 5=Fire
 const G_VALUES = {
   1: [0,116,132,128,128,144,132,140,124,128,124,132,140],
   2: [0,124,120,116,132,136,128,136,140,136,128,128,136],
@@ -458,8 +416,6 @@ const ONLY_MONSTERS = {
 
 function matchesOnlyMonFloor(env,floorMR,name){return MONSTER_DB[ONLY_MONSTERS[env][floorMR]].en===name;}
 
-// Spawn DB: [id, atmin, atmax] for normal monsters, [id] for chest monsters (no AT range)
-// atmax = next larger atmin - 1, or 32767 if largest
 const SPAWN_DB = {
   1:{
     1: [["00B",6555,13107],["00E",13108,19661],["022",0,6554],["026"],["027"],["028"],["082",26215,32767],["08C",19662,26214]],
@@ -536,10 +492,8 @@ const SPAWN_DB = {
 const _elistWtL = new Uint8Array(256);
 const _elistWtU = new Uint8Array(256);
 
-// FloorMR=SMR+int[(Floor-1)/4] - Shared by getFloorElistInfo / checkElistAndD
 function floorMRAt(baseMR,f) {return Math.min(12,baseMR+(f>>2));}
 
-// (envType,floorMR) → 該層的 SPAWN_DB 條目；査無回空陣列
 function getSpawnList(envType,floorMR) {return (SPAWN_DB[envType] && SPAWN_DB[envType][floorMR]) || [];}
 
 function getMonsterDisplayName(hx) {
@@ -547,7 +501,6 @@ function getMonsterDisplayName(hx) {
   return m ?(m.en) : hx;
 }
 
-// ElistOfs 中只由地形決定的部分 (A/B/D)：牆＝TKG 的 TILE_WALL / TILE_DIVIDER，嵌牆寶箱會改變它，所以取放完寶箱後的格子。
 function elistTileStats(floor) {
   const open = (x, y) => floor.grid[y][x] !== tkg.TILE_WALL && floor.grid[y][x] !== tkg.TILE_DIVIDER;
   let W = 0, X = 0;
@@ -567,7 +520,7 @@ function elistTileStats(floor) {
     }
   }
 
-  const C = 4128-(W*16+X*8); // C = boundary, hardcoded in DQ9 game
+  const C = 4128-(W*16+X*8);
   let A,B,D;
 
   if (C >= 0) {
@@ -604,7 +557,6 @@ function getFloorElistInfo(map,f) {
   const onlyMon = onlyMonId && MONSTER_DB[onlyMonId] ? getMonsterDisplayName(onlyMonId) : "Unknown";
   const strOnly = EL_ONLY;
 
-  // 格數統計只由樓層決定，同一樓層算一次共用
   const floor = map.floors[f];
   const {A,B,D} = floor.cache.elist ||(floor.cache.elist = elistTileStats(floor));
 
@@ -618,20 +570,8 @@ function getFloorElistInfo(map,f) {
   const val = ElistOfs;
   let state = null;
 
-  // ======================================================================
-  // DQ9TMAP101.exe wrongly put 2 Mimics on Ruins floorMR 3 because:
-  // (1) If 2-Mimic is true, then Multibugged B7F (Ruins floorMR=3) of 02 0AA0 should be ElistOfs 2B84 (敵無).
-  // (2) But it is proved that Multibugged B7F (Ruins floorMR=3) of 02 0AA0 is Bagma + Metal Medley (敵減 2 種).
-  // So 2-Mimic is false.
-  // ======================================================================
-  // Maybe on Ice floorMR 1, DQ9TMAP101.exe wrongly put 2 Canniboxes either.
-  // But it's unable to verify it since Multibug cannot access any bugged floor's MR <=2.
-  // Anyway, This tool's author already changed Ice floorMR 1 into 1-Cannibox state:
-  // (1) 7 Monsters: Lost Soul - Cannibox - Mimic - Pandora's Box - 2ndMon - 3rdMon - 4thMon
-  // (2) Since no double Canniboxes, G value of Ice1 decreased 16 to 108
-  // ======================================================================
   if (val<=0x2B30) {
-    if (D !== 0) state = EL_P; // 2B30 以下: 有D値時 部分敵無，其他 非特殊
+    if (D !== 0) state = EL_P;
   } else if (val>=0x2B34) {
     const isExc1 = isIce10_12 || isRuins3;
     const isExc2 = (envType===2&&floorMR===7)||(envType===5&&(floorMR===3||floorMR===4))||(envType===3&&floorMR===2)||(envType===4&&floorMR===4);
@@ -639,22 +579,20 @@ function getFloorElistInfo(map,f) {
     const isExc5 =(envType===1&&floorMR===1);
     const EL_diff = Math.floor((val-0x2B34)/20);
     switch (EL_diff) {
-      case 0: state = (isExc1||isExc4) ? (D!== 0?EL_P:null) : EL_4;break; // 2B34~2B44: F=7時 非特殊/部分敵無，其他 4種
-      case 1: state = EL_3;break; // 2B48~2B58: 3種
-      case 2: state = isExc5 ? EL_3+EL_NP : EL_2;break; // 2B5C~2B6C: 洞1 3種+潘多拉消失，其他 2種
-      case 3: state = isExc5 ? EL_3+EL_NM : `${onlyMon}${strOnly}`;break; // 2B70~2B80: 洞1 3種+咪咪消失，其他 ONLY
-      case 4: state = isExc5 ? EL_3+EL_NC : (isExc4||isExc2?`${onlyMon}${strOnly}${EL_NP}`:EL_0);break; // 2B84~2B94: 洞1 3種+食人箱消失，exc2/4 ONLY+潘多拉消失，其他 敵無
-      case 5: state = isExc5 ? EL_2+EL_NC : (isExc4||isExc2?`${onlyMon}${strOnly}${EL_NM}`:EL_0+EL_NP);break; // 2B98~2BA8: 洞1 2種+食人箱消失，exc2/4 ONLY+咪咪消失，其他 敵無+潘多拉消失
-      case 6: state = (isExc4||isExc2||isExc5) ? `${onlyMon}${strOnly}${EL_NC}` : EL_0+EL_NM;break; // 2BAC~2BBC: 洞1/exc2/4 ONLY+食人箱消失，其他 敵無+咪咪消失
-      default: state = EL_0+EL_NC;break; // 2BC0 以上: 敵無+食人箱消失
+      case 0: state = (isExc1||isExc4) ? (D!== 0?EL_P:null) : EL_4;break;
+      case 1: state = EL_3;break;
+      case 2: state = isExc5 ? EL_3+EL_NP : EL_2;break;
+      case 3: state = isExc5 ? EL_3+EL_NM : `${onlyMon}${strOnly}`;break;
+      case 4: state = isExc5 ? EL_3+EL_NC : (isExc4||isExc2?`${onlyMon}${strOnly}${EL_NP}`:EL_0);break;
+      case 5: state = isExc5 ? EL_2+EL_NC : (isExc4||isExc2?`${onlyMon}${strOnly}${EL_NM}`:EL_0+EL_NP);break;
+      case 6: state = (isExc4||isExc2||isExc5) ? `${onlyMon}${strOnly}${EL_NC}` : EL_0+EL_NM;break;
+      default: state = EL_0+EL_NC;break;
     }
   }
   if(state!==null)state=String(state);
   return{hex:ElistOfs.toString(16).toUpperCase(),state:state,dValue:D};
 }
 
-// 解析 ElistOfs state 字串 → 類別 (evalElistFloorHit 用)
-// 註：getFloorElistInfo 產生的各 state 類別互斥 (敵無/ONLY/敵減/部分敵無 不會同時出現在同一字串)
 function classifyElistState(st) {
   st = ''+st;
   if (st.includes(''+EL_0) && !st.includes(''+EL_P)) return {kind:'none'};
@@ -666,13 +604,8 @@ function classifyElistState(st) {
   return {kind:'normal'};
 }
 
-// 1. 步行成本
-
-// 兩點間的步行成本：由呼叫端提供 (overrides.calcPointWalkCost)，不可達回 null
 const calcPointWalkCost = overrides && overrides.calcPointWalkCost;
 
-// 路線 = {cost, legs:[{f, from:[x,y], to:[x,y]}]}，不可達為 null。
-// 每條評估過的完整路線交給 overrides.onRoute (呼叫端藉此知道結果走的是哪條)，checker 只拿到成本。
 function pointWalk(eng,f,x,y,gx,gy){
   const c=calcPointWalkCost(eng,f,x,y,gx,gy);
   return c===null?null:{cost:c,legs:[{f,from:[x,y],to:[gx,gy]}]};
@@ -684,27 +617,20 @@ function reportWalk(w){
   return w===null?null:w.cost;
 }
 
-// 第 0 層到第 (upTo-1) 層的「上樓梯→下樓梯」;任一層不可達回 null
 function walkUpToFloor(eng,upTo){
   const parts=[];
   for(let f=0;f<upTo;f++){const fl=eng.floors[f];parts.push(pointWalk(eng,f,fl.up.x,fl.up.y,fl.down.x,fl.down.y));}
   return joinWalks(NO_WALK,...parts);
 }
 
-// 2. 寶箱巡迴與跨層路線
-
-// 造訪順序候選:2 個目標試兩序,其餘照原序(呼叫端目前最多 2 個)
 const listVisitOrders=(n)=>n===2?[[0,1],[1,0]]:[Array.from({length:n},(_,i)=>i)];
 
-// D/5D/9D 模式 A*：目標樓層前各層(梯到梯)之和 + 目標層 上樓梯→開遍所有目標寶箱
-// 訪問順序取全排列最小——如 DD/1341 B3F:A3 緊鄰上樓梯,先開 A3 再原路掉頭開 A2(1+7=8)短於箱序(6+7=13)
-// 目標寶箱不可達(乳首)回 null
 function calcSameFloorChestChainCost(eng,floor,boxes){
   const sum=walkUpToFloor(eng,floor);
   if(sum===null)return reportWalk(null);
   const fl=eng.floors[floor];
   const n=boxes.length;
-  const px=[fl.up.x],py=[fl.up.y]; // 節點 0=上樓梯, 1..n=目標寶箱
+  const px=[fl.up.x],py=[fl.up.y];
   for(const b of boxes){px.push(fl.chests[b].x);py.push(fl.chests[b].y);}
   const dist=[];
   for(let i=0;i<=n;i++){
@@ -729,7 +655,6 @@ function calcSameFloorChestChainCost(eng,floor,boxes){
   return reportWalk({cost:sum.cost+best,legs:sum.legs.concat(legs)});
 }
 
-// 體感 A* 跨層段:從 (f,x,y) 到 (g,gx,gy);同層直走,下一層=本層→下樓梯+下層上樓梯→目標,上一層=本層→上樓梯+上層下樓梯→目標
 function crossFloorWalk(eng,f,x,y,g,gx,gy){
   if(f===g)return pointWalk(eng,f,x,y,gx,gy);
   const ff=eng.floors[f],fg=eng.floors[g];
@@ -737,8 +662,6 @@ function crossFloorWalk(eng,f,x,y,g,gx,gy){
   return joinWalks(pointWalk(eng,f,x,y,ff.up.x,ff.up.y),pointWalk(eng,g,fg.down.x,fg.down.y,gx,gy));
 }
 
-// 體感 A*(D/5D/9D):wp層前各層梯到梯之和 + wp層上樓梯→wp命中箱 + wp末箱→整列箱(可跨層)
-// 「先取wp」:wp 段先取最短序(同長時取後段較短者),再從 wp 末箱到整列箱取最短(targets 兩顆時試兩序)
 function calcCrossFloorChestRouteCost(eng,wpFloor,wpIdx,targets){
   const prefix=walkUpToFloor(eng,wpFloor);
   if(prefix===null)return reportWalk(null);
@@ -771,9 +694,6 @@ function calcCrossFloorChestRouteCost(eng,wpFloor,wpIdx,targets){
   return reportWalk(best===null?null:{cost:prefix.cost+best.total,legs:prefix.legs.concat(best.legs)});
 }
 
-// ================
-// Location & Base Quality
-// ================
 const RANKS = {
   "02":{fqMin:2,fqMax:55},
   "38":{fqMin:56,fqMax:60},
@@ -789,7 +709,7 @@ const RANKS = {
   "DD":{fqMin:221,fqMax:248}
 };
 
-const BQ_MIN = 2, BQ_MAX = 248; // For BQ's D/D' options: Search maps that only available on BQ 245-248
+const BQ_MIN = 2, BQ_MAX = 248;
 const LOCATION_SEED_MAX = 0x7FFF;
 
 const LOCATION_FQ_BANDS = [
@@ -807,7 +727,6 @@ const BQ_TENTH = new Float64Array(256);
 const BQ_FQ_LO = new Int32Array(256);
 const BQ_FQ_HI = new Int32Array(256);
 
-// --- 驗證與解析函數 ---
 function hasConditionValue(raw) {
   return raw !== null && raw !== undefined && String(raw).trim() !== "";
 }
@@ -854,7 +773,6 @@ function getFinalQualityBounds(rawBaseQ) {
   return {baseQ,minFinalQ:BQ_FQ_LO[baseQ],maxFinalQ:BQ_FQ_HI[baseQ]};
 }
 
-// --- 預計算資料表初始化 ---
 for (let b = BQ_MIN; b <= BQ_MAX; b++) {
   const m = Math.floor(b/10)*2+1;
   BQ_MODULO[b] = m;
@@ -869,7 +787,6 @@ for (let b = BQ_MIN; b <= BQ_MAX; b++) {
   BQ_FQ_HI[b] = hi;
 }
 
-// --- 快取與下拉搜尋功能 ---
 const bqScanRangeCache = {};
 function getBaseQScanRange(fqMin,fqMax) {
   const key = fqMin + ':' + fqMax;
@@ -882,7 +799,6 @@ function getBaseQScanRange(fqMin,fqMax) {
   return r;
 }
 
-// --- Seed & Timer Calculation ---
 let SEED_TO_TIMERS_CACHE = null;
 
 function ensureSeedTimerCache() {
@@ -934,7 +850,6 @@ function calcLocations(seed,rStr) {
     for (const loc in locToBq) addLoc(timer,+loc,locToBq[loc]);
   }
 
-  // Quest 015 exception
   const q15 = QUEST015_EXC;
   if (isQuest015InFQRange(seed,fqMin,fqMax)) addLoc(QUEST015,q15.loc,[q15.bqFill]);
 
@@ -948,7 +863,6 @@ function calcLocations(seed,rStr) {
   return {outputOrder, seenLocations};
 }
 
-// Location Cache
 let _cachedLocData = null;
 let _cachedLocSeed = null;
 let _cachedLocRankKey = null;
@@ -976,12 +890,6 @@ function matchesLocationBQ(locData,locNum,targetLocNum,targetBqNum) {
     &&(targetBqNum === null || bqs.has(targetBqNum));
 }
 
-// ===============
-// Ultimate Search Filters
-// ===============
-
-// 1. Basic functions and helpers
-
 function hex2(n) {return n.toString(16).toUpperCase().padStart(2,'0');}
 
 function buildOnlyMonExpectedStr(conds) {
@@ -989,12 +897,9 @@ function buildOnlyMonExpectedStr(conds) {
   return (conds.onlyMon) + EL_ONLY;
 }
 
-// rank 鍵防禦式解析：RANKS 以兩位大寫 hex 字串為鍵
 function resolveRankKey(rStr,rankNum) {
   return RANKS[rStr] ? rStr : (RANKS["0x"+rStr]?"0x"+rStr:((rankNum!==undefined&&RANKS[rankNum])?rankNum:null));
 }
-
-// 2. Basic Map Conditions
 
 function checkBasicConds(searchEngine,conds) {
   if (conds.prefix && searchEngine.prefix != conds.prefix) return false;
@@ -1022,9 +927,6 @@ function checkOnlyMonPossible(searchEngine,conds) {
   return false;
 }
 
-// 3. Location & BQ Search Filters
-
-// 所有地圖條件搜尋共用。
 function checkLocationBQ(seed,conds,searchFilterLoc,targetRankKey) {
   const filters = getLocationBQFilters(conds);
   if (!filters.valid) return {match: false};
@@ -1058,15 +960,11 @@ function checkUltimateCondsMatch(engine,seed,targetRankKey,conds,searchFilterLoc
   return true;
 }
 
-// 4. ElistOfs & D-Value (Flag0) Filters
-
-// 組合模式 (ElistOfs + ONLY 怪物)：該層 floorMR 的 ONLY 怪物是否為指定怪物
 function isCombinedOnlyHit(envType,floorMR,onlyMonNameStr) {
   if (!getSpawnList(envType,floorMR).length) return false;
   return matchesOnlyMonFloor(envType,floorMR,onlyMonNameStr);
 }
 
-// 每層 elist 命中判定
 function evalElistFloorHit(searchEngine,f,info,elistCond) {
   const {kind, count} = classifyElistState(info.state);
   const targetCount = kind === 'reduced' ? count : 0;
@@ -1162,8 +1060,6 @@ function checkElistAndD(searchEngine, conds, searchOnlyWithD, _onlyMonExpectedSt
   return result;
 }
 
-// 6. Rank Filtering & SMR Bounds
-
 function rankCanDropInMRRange(r, numMin, numMax) {
   for (let num = numMin; num <= numMax; num++) {
     const cMin = D_F[(num - 1) * 4 + 1];
@@ -1176,7 +1072,6 @@ function rankCanDropInMRRange(r, numMin, numMax) {
 function getRankSMRInfo(rank, conds) {
   let rStr = hex2(rank);
 
-  // 1. BQ Check
   if (conds && hasConditionValue(conds.bq)) {
     const bounds = getFinalQualityBounds(conds.bq);
     if (!bounds) return null;
@@ -1185,16 +1080,13 @@ function getRankSMRInfo(rank, conds) {
     if (rankInfo &&(maxFinalQ < rankInfo.fqMin || minFinalQ > rankInfo.fqMax)) return null;
   }
 
-  // 2. SMR range (D_C)
   const [minSMR, maxSMR] = row4(D_C, 8, rank, [1, 9]);
 
-  // 3. Monster condition
   if ((conds!==null&&conds!==void 0)&&conds.monster){
     let targetSMR = parseInt(conds.monster);
     if (targetSMR < minSMR || targetSMR > maxSMR) return null;
   }
 
-  // 4. Floor range (D_B)
   const [floorLo, floorHi] = row4(D_B, 9, rank, [2, 16]);
   let maxFloorCount = floorHi;
   if ((conds!==null&&conds!==void 0)&&conds.depth){
@@ -1207,14 +1099,12 @@ function getRankSMRInfo(rank, conds) {
     if (d2 > floorHi) return null;
   }
 
-  // 5. Boss range (D_D)
   const [minBoss, maxBoss] = row4(D_D, 9, rank, [1, 12]);
   if ((conds!==null&&conds!==void 0)&&conds.boss){
     let b = parseInt(conds.boss);
     if (b < minBoss || b > maxBoss) return null;
   }
 
-  // 6. Lv Check
   if ((conds!==null&&conds!==void 0)&&conds.lv){
     const clampLv = v => v < 1 ? 1 : v > 99 ? 99 : v;
     let dLo = conds.depth ? parseInt(conds.depth) : floorLo;
@@ -1232,7 +1122,6 @@ function getRankSMRInfo(rank, conds) {
   return {minSMR, maxSMR, maxFloorCount, minBoss, maxBoss};
 }
 
-// 共用通用 Rank 篩選器 (Ultimate Search 專用)
 function sharedRankFilter(ranksToSearch, conds) {
   if (!getLocationBQFilters(conds).valid) return [];
 
@@ -1299,10 +1188,6 @@ function sharedRankFilter(ranksToSearch, conds) {
   });
 }
 
-// ========
-// Item Search
-// ========
-
 const ITEMS_MILLIONAIRE = ["Hero spear","Pruning knife","Wyrmwand","Wizardly whip","Beast claws","Attribeauty","Heavy hatchet","Megaton hammer","Pentarang","Metal slime sword","Metal slime spear"];
 const ITEMS_MILLIONAIRE_BOX3 = ITEMS_MILLIONAIRE.slice(0, 7);
 const ITEMS_S_WEAPONS = ["Stardust sword","Poker","Deft dagger","Bright staff","Gringham whip","Knockout rod","Dragonlord claws","Critical fan","Bad axe","Groundbreaker","Meteorang","Angel's bow"];
@@ -1321,7 +1206,6 @@ function getChestRanksForItems(itemNames){
   return ranks;
 }
 
-// 特定 SMR + 寶箱組合 與 指定樓層 Offset 的 Rank 篩選器
 function filterMapRanksBySMRAndChest(ranksToSearch, conds, chestRankGroups, targetFloorOffset) {
   return ranksToSearch.filter(rank => {
     const info = getRankSMRInfo(rank, conds);
@@ -1347,28 +1231,20 @@ function filterMapRanksBySMRAndChest(ranksToSearch, conds, chestRankGroups, targ
   });
 }
 
-// Chest counts：counts[r-1] 逐 Rank 比對 reqBox，全符合回傳「S1 A2」字串，否則 null
-// 寶箱數條件：每個指定 Rank 的寶箱數都要相符
 function chestCondsMatch(engine,conds){
   if (!conds.hasBoxCond) return true;
   for (let r=10;r>=1;r--) if (conds.reqBox[r]>0 && engine.chestRankCounts[r-1] !== conds.reqBox[r]) return false;
   return true;
 }
 
-// A*
-// 共用者：third / jfire / tk 三個 checker 的 astarText
 const fmtStep = v => Number.isInteger(v) ? '' + v : v.toFixed(1);
 const fmtStepD = v => v == null ? '—' : fmtStep(v);
 const minAstar = arr => {const m = Math.min(...arr.map(v => v == null ? Infinity : v));return m === Infinity ? null : m;};
 
-// 3. Item Search
-
 const CHEST_TIMER_OFFSET = 5;
 
-// QL 系 (quickload / quickload9) 地圖基本門檻
 const meetsQuickloadBasicReq = (eng, p, conds) => eng.floorCount >=(p.isB9F ? 9 : 3) && filterMapRanksBySMRAndChest([eng.rank], conds, [p.chestRanks], p.isB9F ? 2 : 0).length > 0;
 
-// 物品搜尋：各模式的地圖基本門檻 (checkBasicReq)
 const ITEM_BASIC_REQS = {
   quickload: meetsQuickloadBasicReq,
   quickload9: meetsQuickloadBasicReq,
@@ -1377,12 +1253,10 @@ const ITEM_BASIC_REQS = {
   tk: eng => eng.floorCount >= 3,
 };
 
-// ⑨/⑤ 標記：內部秒數取自 p.qlSec (缺省 4s=⑨、0s=⑤)
 const QL_MARK_5 = {sec: 0, mk: '⑤', mkColor: '#7fd4ff'}, QL_MARK_9 = {sec: 4, mk: '⑨', mkColor: '#b19cd9'};
 const getQuickloadMark = (p) => (p.qlSec === 0 ? QL_MARK_5 : QL_MARK_9);
 const QL_SOLO = {sec: 1, mk: STR_SOLO, mkColor: '#f9b'}, QL_PARTY = {sec: 2, mk: STR_PARTY, mkColor: '#ffd700'};
 
-// QL 系 checker 的收尾
 const buildQuickloadResult = (eng, p, st) => {
   if (st.useB10) return st.multi.length > 0 ? {isHit: true, multi: st.multi} : {isHit:false};
   if (st.hitTypes.length === 0) return {isHit:false};
@@ -1394,13 +1268,12 @@ const buildQuickloadResult = (eng, p, st) => {
   return res;
 };
 
-// quickload／quickload9 共用：逐層以 modeA（、modeB）的秒數計數，同層第一個達標的 mode 決定 A* 用的箱子
 function scanQuickloadFloors(eng, p, modeA, modeB) {
   const checkSet = new Set(p.checkItems);
   let hitTypes = [];
   let firstHitFloor = -1;
   let astarBoxes = null, astarFloor = -1;
-  const useB10 = !!(p.checkB10 && p.isB9F); // 5D/9D 模式 B9F 搜尋:同條件追査 B10F
+  const useB10 = !!(p.checkB10 && p.isB9F);
   const floors = useB10 ? [8, 9] : p.targetFloors;
   const multi = [];
 
@@ -1433,7 +1306,6 @@ function scanQuickloadFloors(eng, p, modeA, modeB) {
   return buildQuickloadResult(eng, p, {useB10, multi, hitTypes, firstHitFloor, astarFloor, astarBoxes});
 }
 
-// jfire／tk 共用：掃 wp 層前兩箱，命中寫進 hits／soloIdx／partyIdx；soloColor 是非即開命中的顏色
 function scanWpFirstTwo(eng, p, fIdx, uniSec, wpSet, soloColor, hits, soloIdx, partyIdx) {
   const soloNames = eng.chestItems(fIdx, uniSec == null ? 1 : uniSec);
   const partyNames = uniSec == null ? eng.chestItems(fIdx, 2) : soloNames;
@@ -1482,13 +1354,10 @@ function checkTKThirdChest(eng, floor, checkSec, laterSec, targets, laterTargets
 
 const DUNGEON_CHECKERS = {
 
-  // 1. Quickload item x2~3 (B3/B4/B9)
   quickload: (eng, p) => scanQuickloadFloors(eng, p, QL_SOLO, QL_PARTY),
 
-  // 1b. ⑨/⑤
   quickload9: (eng, p) => scanQuickloadFloors(eng, p, getQuickloadMark(p)),
 
-  // 2. 3rd Chest
   third: (eng, p) => {
     let f1 = p.targetFloors[0], f2 = p.targetFloors[1];
     if (eng.floors[f1].chests.length >= 3 && eng.floors[f2].chests.length >= 3) {
@@ -1505,8 +1374,6 @@ const DUNGEON_CHECKERS = {
           isHit: true, jumpFloor: f1,
           displayHtml: `B${f1 + 1}F ${r1}3: ${p1}<br>B${f2 + 1}F ${r2}3: ${p2}`
         };
-        // D/5D/9D 整列箱 A*:完整顯示「順走 / 逆走」兩條路線；不代選路線，僅以較小値排序。
-        // 順走=入口到 f1 S3，再下樓到 f2 S3；逆走=入口直下 f2 S3，再回樓上開 f1 S3。
         if (p.wantAstar) {
           const up1 = eng.floors[f1].up, c1 = eng.floors[f1].chests[2], c2 = eng.floors[f2].chests[2];
           const prefix = walkUpToFloor(eng, f1);
@@ -1530,7 +1397,6 @@ const DUNGEON_CHECKERS = {
     return {isHit:false};
   },
 
-  // 3a. JFire
   jfire: (eng, p) => {
     const uniSec = (p.qlSec == null) ? null : p.qlSec;
     const shift = uniSec == null ? 0 : uniSec - 2;
@@ -1588,7 +1454,6 @@ const DUNGEON_CHECKERS = {
     return multi.length > 0 ? {isHit: true, multi} : {isHit:false};
   },
 
-  // 3b. TK (B3/B4)
   tk: (eng, p) => {
     let wpSet = new Set(p.wpTargets);
     let wpMet = false, wpFloor = 2;
@@ -1605,7 +1470,6 @@ const DUNGEON_CHECKERS = {
       return true;
     };
 
-    // 寶箱怪的邏輯
     if (p.isMonsterBox) {
       if (!checkWp(2)) return {isHit:false};
 
@@ -1614,7 +1478,6 @@ const DUNGEON_CHECKERS = {
         b3Rank = CHEST_RANK[eng.floors[2].chests[2].rank] || '?';
         let foundSec = -1;
 
-        // 在指定的秒數範圍內跑迴圈，找到任何一秒出寶箱怪即達標 (區間隨模式平移)
         for (let s = p.minSec + shift; s <= p.maxSec + shift; s++) {
           if (eng.chestItem(2, 2, s) === p.targetItem) {foundSec = s; break;}
         }
@@ -1627,7 +1490,6 @@ const DUNGEON_CHECKERS = {
       if (c1Met) {
         let html = `${wpHits.join('<br>')}<br><span style="color:#f66;font-size:11px;font-weight:bold;">${matDet}</span>`;
         const res = {isHit: true, jumpFloor: 2, displayHtml: html, specialStyle: "1px solid #f66"};
-        // D 模式:B3F 上樓梯→wp命中箱→第3箱(同層);即開/一人旅命中組不同時各算各的,顯示「即開時格子數 / 一人旅時格子數」
         if (p.wantAstar) {
           const c3 = eng.floors[2].chests[2];
           const tgt = [{g:2, gx:c3.x, gy:c3.y}];
@@ -1640,7 +1502,6 @@ const DUNGEON_CHECKERS = {
       return {isHit:false};
     }
 
-    // 一般物品與大富豪的邏輯
     if (!checkWp(2)) checkWp(3);
     if (!wpMet) return {isHit:false};
 
@@ -1652,15 +1513,12 @@ const DUNGEON_CHECKERS = {
     let checkSec = (p.isMillionaire ? 2 : 8) + shift;
     let labelText = p.isMillionaire ? "" : `(${checkSec + CHEST_TIMER_OFFSET}s)`;
 
-    // 檢査 B3F 第 3 箱
     const {valid:b3V, item:pB3, rank:b3Rank} = checkTKThirdChest(eng, 2, checkSec, 20+shift,
       currentB3Targets, p.isMillionaire ? p.strictMatTargets : currentB3Targets);
 
-    // 檢査 B4F 第 3 箱
     const {valid:b4V, item:pB4, rank:b4Rank} = checkTKThirdChest(eng, 3, checkSec, 20+shift,
       currentB4Targets, p.isMillionaire ? p.strictMatTargets : currentB4Targets);
 
-    // 結算命中狀態，並動態加上對應的標籤
     if (b3V && b4V) {c2Met = true; matDet = `B3F ${b3Rank}3 ${labelText}: ${pB3}<br>B4F ${b4Rank}3 ${labelText}: ${pB4}`;}
     else if (b3V) {c1Met = true; matDet = `B3F ${b3Rank}3 ${labelText}: ${pB3}`;}
     else if (b4V) {c1Met = true; matDet = `B4F ${b4Rank}3 ${labelText}: ${pB4}`;}
@@ -1668,9 +1526,6 @@ const DUNGEON_CHECKERS = {
     if (c1Met || c2Met) {
       let html = `${wpHits.join('<br>')}<br><span style="color:#11F514;font-size:11px">${matDet}</span>`;
       const res = {isHit: true, jumpFloor: wpFloor, displayHtml: html, specialStyle: c2Met ? "1px solid #fa0" : ""};
-      // D 模式體感 A*:wp層前各層梯到梯之和 + 上樓梯→wp命中箱 + wp末箱→整列箱(跨層經樓梯段)
-      // wp 即開/一人旅命中組不同時不可混走一條鏈 → 各算各的,顯示兩數「即開時格子數 / 一人旅時格子數」(雙整列時各取三選項最小)
-      // 單案例且雙整列(c2Met)列三數「只取B3F整列 / 只取B4F整列 / 兩顆都取」;排序鍵一律取所列最小
       if (p.wantAstar) {
         const t3 = b3V ? {g: 2, gx: eng.floors[2].chests[2].x, gy: eng.floors[2].chests[2].y} : null;
         const t4 = b4V ? {g: 3, gx: eng.floors[3].chests[2].x, gy: eng.floors[3].chests[2].y} : null;
@@ -1698,7 +1553,6 @@ const DUNGEON_CHECKERS = {
     return {isHit:false};
   }
 };
-
 
 return {
     TreasureMap, MAP_RANK, CHEST_RANK, hex2, resolveRankKey, resetLocationCache,
