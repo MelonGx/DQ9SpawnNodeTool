@@ -1242,8 +1242,7 @@
                 const finalX = (baseX + modX) >> 12;
                 const finalZ = (baseZ + modZ) >> 12;
 
-                // fx/fz: exact fx32 position (before >> 12), used by distance.js
-                results[entry.key] = { x: finalX, z: finalZ, fx: baseX + modX, fz: baseZ + modZ };
+                results[entry.key] = { x: finalX, z: finalZ };
             });
 
             return results;
@@ -1351,7 +1350,7 @@
                 const finalX = (baseX + modX) >> 12;
                 const finalZ = (baseZ + modZ) >> 12;
 
-                results[index] = { x: finalX, z: finalZ, fx: baseX + modX, fz: baseZ + modZ };
+                results[index] = { x: finalX, z: finalZ };
             });
 
             return results;
@@ -1611,7 +1610,8 @@
             const topOverlay = document.getElementById("topOverlay");
             const outer = document.querySelector(".grid-scale-wrapper");
 
-            const displaySize = Math.min(window.innerWidth * 0.95, 1024);
+            // layout.js may size the map to its column
+            const displaySize = window.mapDisplaySize ? window.mapDisplaySize() : Math.min(window.innerWidth * 0.95, 1024);
             const scale = displaySize / 1024;
 
             wrapper.style.transform = `scale(${scale})`;
@@ -1791,5 +1791,8 @@
     </script>
     <script src="ideal-walk.js"></script>
     <script src="distance.js"></script>
+    <script src="dq9at-core.js"></script>
+    <script src="search.js"></script>
+    <script src="layout.js"></script>
 </body>
 </html>

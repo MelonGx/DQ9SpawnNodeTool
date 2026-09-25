@@ -1,19 +1,18 @@
 // Ideal-walk panel: shortest walking distance between the stairs and chests of the current floor,
 // computed by ideal-walk.js on TKG's rendered terrain, with the path drawn on the map.
 (function () {
-    const walk = createIdealWalk();
+    const walk = createIdealWalk(16, { TILE_WALL, TILE_DIVIDER, tileMap });
     const TILE = walk.TILE;
     const PX_PER_TILE = 64;
     const SVG_NS = "http://www.w3.org/2000/svg";
     const PATH_COLOR = "#ff00ff";
 
-    let state = null;               // { points, dist, straight, diag, dq9at, paths }
+    let state = null;               // { points, dist, dq9at, path(id) }
     let sel = { from: 'up', to: 'down' };
+    let route = null;               // { seed, floor, legs: [[fromKey, toKey], ...] } from the search
 
-    function isWalkableTile(tx, ty) {
-        return tx >= 0 && ty >= 0 && tx < mapWidth && ty < mapHeight &&
-               mapGrid[ty][tx] !== TILE_WALL && mapGrid[ty][tx] !== TILE_DIVIDER;
-    }
+    // TKG's tile read (FUN_02092934: -1 off the map)
+    const isWalkableTile = (tx, ty) => ![TILE_WALL, TILE_DIVIDER, -1].includes(FUN_02092934(mapContext, tx, ty));
 
     // DQ9AT's calcPointWalkCost, for side-by-side display (not an equivalent of the distance above):
     // A* between tile centres, orthogonal step 1, diagonal step 1.5, diagonal only when both
@@ -58,8 +57,12 @@
     function collectPoints() {
         const pts = [];
         const sc = mapContext.stairsCoords || {};
+        // TKG's in-tile offsets (modifiers / exceptions; x and z use the same values)
+        const offsets = [...new Set(modifiers.concat(Object.values(exceptions)).map(m => m.x))];
         const add = (key, label, name, color, c, tile) => {
-            if (c && tile && c.fx !== undefined) pts.push({ key, label, name, color, x: c.fx, y: c.fz, tx: tile.x, ty: tile.y });
+            if (!c || !tile) return;
+            const x = walk.exactCoord(c.x, tile.x, offsets), y = walk.exactCoord(c.z, tile.y, offsets);
+            if (x !== null && y !== null) pts.push({ key, label, name, color, x, y, tx: tile.x, ty: tile.y });
         };
         add('up', 'U', 'Up Stairs', '#00ff00', sc.up, mapContext.upStairs);
         add('down', 'D', 'Down Stairs', '#ff4040', sc.down, mapContext.downStairs);
@@ -74,54 +77,76 @@
         walk.setFloor({ grid: mapGrid, width: mapWidth, height: mapHeight, bitfield: bitfieldGrid,
                         env: envIndices[getEnvironment(mapContext.field_0.mapseed)] });
         const points = collectPoints();
-        const graph = walk.buildGraph(points);
+        const stairs = points.map((p, k) => (p.key === 'up' || p.key === 'down') ? k : -1).filter(k => k >= 0);
 
-        // straight / diag: tiles walked orthogonally / diagonal steps (1 tile on both axes) on that path
-        const dist = {}, straight = {}, diag = {}, dq9at = {}, paths = {};
+        const dist = {}, dq9at = {};
         points.forEach((a, i) => {
-            const res = walk.dijkstra(graph.nodes, graph.adj, i);
+            const d = walk.gridFrom(points, i, stairs);
             points.forEach((b, j) => {
                 const id = a.key + '>' + b.key;
-                dist[id] = res.dist[j];
+                dist[id] = d[j];
                 dq9at[id] = dq9atStepCost(a.tx, a.ty, b.tx, b.ty);
-
-                const chain = walk.chainTo(graph, res, j);
-                straight[id] = diag[id] = 0;
-                for (let s = 1; s < chain.length; s++) {
-                    const dx = Math.abs(chain[s].x - chain[s - 1].x), dy = Math.abs(chain[s].y - chain[s - 1].y);
-                    straight[id] += (Math.max(dx, dy) - Math.min(dx, dy)) / TILE;
-                    diag[id] += Math.min(dx, dy) / TILE;
-                }
-                const legs = chain.length ? [chain[0]] : [];
-                for (let s = 1; s < chain.length; s++) legs.push(...walk.octileLegs(chain[s - 1], chain[s], 6));
-                paths[id] = legs;
             });
         });
 
-        state = { points, dist, straight, diag, dq9at, paths };
+        // Paths are only worked out when drawn (walk.gridPath picks the plainest shortest walk)
+        const paths = {};
+        const path = id => {
+            if (!(id in paths)) {
+                const [f, t] = id.split('>'), i = points.findIndex(p => p.key === f), j = points.findIndex(p => p.key === t);
+                paths[id] = (i < 0 || j < 0 || i === j) ? [] : walk.gridPath(points, i, j, stairs);
+            }
+            return paths[id];
+        };
+
+        state = { points, dist, dq9at, path };
     }
 
-    function drawPath(walk) {
+    // Tiles walked straight / diagonal steps (1 tile on both axes) of a length: a + b * sqrt2 steps of
+    // 1/16 tile has only one integer split, so it follows from the length itself
+    function split(len) {
+        const steps = len * 16;
+        for (let b = 0; b * Math.SQRT2 <= steps + 1e-9; b++) {
+            const a = steps - b * Math.SQRT2;
+            if (Math.abs(a - Math.round(a)) < 1e-6) return [Math.round(a) / 16, b / 16];
+        }
+        return [NaN, NaN];
+    }
+    const splitText = len => {
+        const [a, b] = len < Infinity ? split(len) : [0, 0];
+        return `straight ${a.toFixed(3)} + diagonal ${b.toFixed(3)} steps`;
+    };
+
+    // walks: list of point lists, one polyline each
+    function drawPath(walks) {
         const topOverlay = document.getElementById("topOverlay");
         const old = document.getElementById("distPath");
         if (old) old.remove();
-        if (!walk || walk.length < 2) return;
+        walks = (walks || []).filter(w => w && w.length >= 2);
+        if (!walks.length) return;
 
         const g = document.createElementNS(SVG_NS, "g");
         g.setAttribute("id", "distPath");
-        const pts = walk.map(p => `${p.x / TILE * PX_PER_TILE},${p.y / TILE * PX_PER_TILE}`).join(" ");
         [["#000000", 6], [PATH_COLOR, 3]].forEach(([color, width]) => {
-            const line = document.createElementNS(SVG_NS, "polyline");
-            line.setAttribute("points", pts);
-            line.setAttribute("fill", "none");
-            line.setAttribute("stroke", color);
-            line.setAttribute("stroke-width", width);
-            line.setAttribute("stroke-linejoin", "round");
-            line.setAttribute("stroke-linecap", "round");
-            g.appendChild(line);
+            for (const walkPts of walks) {
+                const line = document.createElementNS(SVG_NS, "polyline");
+                line.setAttribute("points", walkPts.map(p => `${p.x / TILE * PX_PER_TILE},${p.y / TILE * PX_PER_TILE}`).join(" "));
+                line.setAttribute("fill", "none");
+                line.setAttribute("stroke", color);
+                line.setAttribute("stroke-width", width);
+                line.setAttribute("stroke-linejoin", "round");
+                line.setAttribute("stroke-linecap", "round");
+                g.appendChild(line);
+            }
         });
         // Below the stairs/chest markers
         topOverlay.insertBefore(g, topOverlay.firstChild);
+    }
+
+    // The search route, if it belongs to the floor on screen
+    function activeRoute() {
+        const m = mapContext && mapContext.field_0;
+        return route && m && m.mapseed === route.seed && Number(m.floor) === route.floor ? route : null;
     }
 
     const fmt = (v, digits) => v === Infinity ? 'unreachable' : v.toFixed(digits);
@@ -136,28 +161,30 @@
         if (!state || state.points.length < 2) {
             fromSel.innerHTML = toSel.innerHTML = table.innerHTML = posTable.innerHTML = "";
             result.textContent = "Nothing to measure on this floor.";
-            drawPath(null);
+            drawPath([]);
             return;
         }
 
         const pts = state.points;
         const keys = pts.map(p => p.key);
-        if (!keys.includes(sel.from)) sel.from = 'up';
-        if (!keys.includes(sel.to)) sel.to = 'down';
+        // '' = None: no pair picked, no route drawn
+        if (sel.from && !keys.includes(sel.from)) sel.from = 'up';
+        if (sel.to && !keys.includes(sel.to)) sel.to = 'down';
 
-        const options = pts.map(p => `<option value="${p.key}">${p.label}　${p.name}</option>`).join("");
+        const options = `<option value="">None</option>` + pts.map(p => `<option value="${p.key}">${p.label} ${p.name}</option>`).join("");
         fromSel.innerHTML = toSel.innerHTML = options;
         fromSel.value = sel.from;
         toSel.value = sel.to;
 
-        const id = sel.from + '>' + sel.to;
+        const id = (sel.from && sel.to) ? sel.from + '>' + sel.to : '';
         const d = state.dist[id];
-        if (d === Infinity) {
+        if (!id) {
+            result.innerHTML = `<div class="dist-muted">No route shown. Pick From and To, or a table cell.</div>`;
+        } else if (d === Infinity) {
             result.innerHTML = `Distance: <b>unreachable</b>`;
         } else {
-            const a = state.straight[id], b = state.diag[id];
             result.innerHTML =
-                `<div>Distance: <b>${fmt(d, 3)}</b> tiles = straight ${a.toFixed(3)} + diagonal ${b.toFixed(3)} steps × √2</div>` +
+                `<div>Distance: <b>${fmt(d, 3)}</b> tiles = ${splitText(d)} × √2</div>` +
                 `<div class="dist-muted">DQ9AT A* (tile centres, no corner cutting): ${fmt(state.dq9at[id], 1)}</div>`;
         }
 
@@ -173,16 +200,27 @@
         const rows = pts.map(a => {
             const cells = pts.map(b => {
                 const cid = a.key + '>' + b.key;
-                if (a.key === b.key) return `<td class="dist-self">–</td>`;
+                // same point: picks None (no route drawn)
+                if (a.key === b.key) return `<td class="pick dist-self" data-from="" data-to="" title="No route">–</td>`;
                 const cls = cid === id ? 'pick sel' : 'pick';
-                const tip = `straight ${state.straight[cid].toFixed(3)} + diagonal ${state.diag[cid].toFixed(3)} steps | DQ9AT A*: ${fmt(state.dq9at[cid], 1)}`;
+                const tip = `${splitText(state.dist[cid])} | DQ9AT A*: ${fmt(state.dq9at[cid], 1)}`;
                 return `<td class="${cls}" data-from="${a.key}" data-to="${b.key}" title="${tip}">${fmt(state.dist[cid], 2)}</td>`;
             }).join("");
             return `<tr><th style="color:${a.color}">${a.label}</th>${cells}</tr>`;
         }).join("");
         table.innerHTML = `<tr><th></th>${head}</tr>${rows}`;
 
-        drawPath(state.paths[id]);
+        const r = activeRoute();
+        if (r) {
+            const name = k => (pts.find(p => p.key === k) || { label: '?' }).label;
+            const c = r.legs.reduce((s, [f, t]) => s + state.dist[f + '>' + t], 0);
+            const stops = [r.legs[0][0]].concat(r.legs.map(l => l[1])).map(name).join(' → ');
+            result.innerHTML = `<div>Search route: <b>${stops}</b> = <b>${fmt(c, 3)}</b> tiles = ${splitText(c)} × √2</div>` +
+                               `<div class="dist-muted">From / To or the table below show a single pair again.</div>`;
+            drawPath(r.legs.map(([f, t]) => state.path(f + '>' + t)));
+        } else {
+            drawPath(id ? [state.path(id)] : []);
+        }
     }
 
     function buildPanel() {
@@ -208,7 +246,7 @@
         panel.className = "panel dist-panel";
         panel.innerHTML = `
             <div class="dist-row">
-                <b>Ideal Walk</b><span class="dist-note">horizontal / vertical / 45° moves only; unit = one tile edge</span>
+                <b>Ideal Walk</b><span class="dist-note">horizontal / vertical / 45° steps between 1/16-tile cells, no diagonal past a wall cell, other stairs avoided; unit = one tile edge</span>
             </div>
             <div class="dist-row">
                 <label for="distFrom">From</label><select id="distFrom"></select>
@@ -226,12 +264,13 @@
         `;
         document.querySelector(".panel").after(panel);
 
-        document.getElementById("distFrom").addEventListener("change", e => { sel.from = e.target.value; render(); });
-        document.getElementById("distTo").addEventListener("change", e => { sel.to = e.target.value; render(); });
+        document.getElementById("distFrom").addEventListener("change", e => { sel.from = e.target.value; route = null; render(); });
+        document.getElementById("distTo").addEventListener("change", e => { sel.to = e.target.value; route = null; render(); });
         document.getElementById("distTable").addEventListener("click", e => {
             const td = e.target.closest("td.pick");
             if (!td) return;
             sel = { from: td.dataset.from, to: td.dataset.to };
+            route = null;
             render();
         });
     }
@@ -247,6 +286,13 @@
     document.getElementById('floor').addEventListener('input', update);
     update();
 
-    window.DQ9Distance = { getState: () => state, segmentClear: walk.segmentClear, octile: walk.octile, dq9atStepCost,
-                           isFree: walk.isFree, reflexWallDir: walk.reflexWallDir, size: walk.size };
+    // Show a search result's route on one floor: legs [[fromKey, toKey], ...] ('up', 'down', 'c0', ...)
+    function showRoute(seedHex, floor1, legs) {
+        route = { seed: seedHex.toUpperCase().padStart(4, '0'), floor: floor1, legs };
+        document.getElementById('mapSeed').value = route.seed;
+        document.getElementById('floor').value = floor1;
+        document.getElementById('floor').dispatchEvent(new Event('input'));
+    }
+
+    window.DQ9Distance = { showRoute };
 })();
