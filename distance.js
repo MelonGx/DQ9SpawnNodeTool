@@ -251,11 +251,11 @@
         const fromSel = document.getElementById("distFrom");
         const toSel = document.getElementById("distTo");
         const result = document.getElementById("distResult");
-        const coords = document.getElementById("distCoords");
+        const posTable = document.getElementById("distPosTable");
         const table = document.getElementById("distTable");
 
         if (!state || state.points.length < 2) {
-            fromSel.innerHTML = toSel.innerHTML = table.innerHTML = coords.innerHTML = "";
+            fromSel.innerHTML = toSel.innerHTML = table.innerHTML = posTable.innerHTML = "";
             result.textContent = "這層沒有可計算的目標。";
             drawPath(null);
             return;
@@ -276,9 +276,13 @@
         const diff = (d === Infinity || od === Infinity) ? '' : `，差 ${d - od >= 0 ? '+' : ''}${(d - od).toFixed(3)}`;
         result.innerHTML = `距離：<b>${fmt(d, 3)}</b> 格　<span class="dist-muted">（方格中心 A*：${fmt(od, 3)} 格${diff}）</span>`;
 
-        coords.innerHTML = '座標（格）：' + pts.map(p =>
-            `<span style="color:${p.color}">${p.label}</span> (${(p.x / TILE).toFixed(3)}, ${(p.y / TILE).toFixed(3)})`
-        ).join('　');
+        // In-tile position: bottom-left of the tile is (0, 0), centre is (0.5, 0.5)
+        const posRows = pts.map(p => {
+            const inX = p.x / TILE - p.tx, inY = 1 - (p.y / TILE - p.ty);
+            return `<tr><th style="color:${p.color}">${p.label}</th><td class="dist-name">${p.name}</td>` +
+                   `<td>(${p.tx}, ${p.ty})</td><td>${inX.toFixed(3)}</td><td>${inY.toFixed(3)}</td></tr>`;
+        }).join("");
+        posTable.innerHTML = `<tr><th></th><th>名稱</th><th>方格</th><th>格內 X</th><th>格內 Y</th></tr>${posRows}`;
 
         const head = pts.map(p => `<th style="color:${p.color}">${p.label}</th>`).join("");
         const rows = pts.map(a => {
@@ -310,6 +314,8 @@
             .dist-table td.pick:hover { background: #3a3a3a; }
             .dist-table td.sel { background: #6a206a; color: #fff; }
             .dist-table td.dist-self { color: #666; text-align: center; }
+            .dist-table td.dist-name { text-align: left; }
+            .dist-panel .dist-tables { align-items: flex-start; gap: 16px; }
         `;
         document.head.appendChild(style);
 
@@ -324,8 +330,13 @@
                 <label for="distTo">終點</label><select id="distTo"></select>
             </div>
             <div class="dist-row" id="distResult"></div>
-            <div class="dist-row dist-note" id="distCoords"></div>
-            <table class="dist-table" id="distTable"></table>
+            <div class="dist-row dist-tables">
+                <table class="dist-table" id="distTable"></table>
+                <div>
+                    <table class="dist-table" id="distPosTable"></table>
+                    <div class="dist-note">格內位置：左下角 (0, 0)，正中心 (0.5, 0.5)</div>
+                </div>
+            </div>
         `;
         document.querySelector(".panel").after(panel);
 
