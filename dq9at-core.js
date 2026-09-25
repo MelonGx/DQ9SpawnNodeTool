@@ -590,7 +590,7 @@ function getFloorElistInfo(map,f) {
     }
   }
   if(state!==null)state=String(state);
-  return{hex:ElistOfs.toString(16).toUpperCase(),state:state,dValue:D};
+  return{hex:ElistOfs.toString(16).toUpperCase(),state:state};
 }
 
 function classifyElistState(st) {
@@ -981,12 +981,11 @@ function evalElistFloorHit(searchEngine,f,info,elistCond) {
   return isElistHit;
 }
 
-function checkElistAndD(searchEngine, conds, searchOnlyWithD, _onlyMonExpectedStr) {
-  let result = {match:true, jumpToFloor:-1, hasMatchedD:false};
-  if (!(conds.elist || conds.onlyMon || searchOnlyWithD)) return result;
+function checkElistAndD(searchEngine, conds, _onlyMonExpectedStr) {
+  let result = {match:true, jumpToFloor:-1};
+  if (!(conds.elist || conds.onlyMon)) return result;
 
   const isCombinedSearch = isCombinedElistMonsterSearch(conds);
-  let hasAnyD = false;
   let elistMatched = !conds.elist;
   let onlyMatched = !conds.onlyMon;
 
@@ -1003,7 +1002,6 @@ function checkElistAndD(searchEngine, conds, searchOnlyWithD, _onlyMonExpectedSt
   for (let f = 0; f < searchEngine.floorCount; f++) {
     let info = getFloorElistInfo(searchEngine, f);
     if (!info.state) continue;
-    if (info.dValue > 0) hasAnyD = true;
 
     const isElistHit = evalElistFloorHit(searchEngine, f, info, conds.elist);
 
@@ -1011,11 +1009,10 @@ function checkElistAndD(searchEngine, conds, searchOnlyWithD, _onlyMonExpectedSt
       isCombinedOnlyHit(envType,floorMRAt(baseMR,f),conds.onlyMon);
 
     specialFloorCount++;
-    currentMapSpecials.push({f, dValue:info.dValue});
+    currentMapSpecials.push(f);
 
     if (isCombinedSearch) {
       if (isCombinedMatchedThisFloor) {
-        if (info.dValue > 0) result.hasMatchedD = true;
         if (!elistMatched) {
           elistMatched = true;
           onlyMatched = true;
@@ -1024,14 +1021,12 @@ function checkElistAndD(searchEngine, conds, searchOnlyWithD, _onlyMonExpectedSt
       }
     } else {
       if (conds.elist && conds.elist !== 'MULTI_SPECIAL' && isElistHit) {
-        if (info.dValue > 0) result.hasMatchedD = true;
         if (!elistMatched) {
           elistMatched = true;
           if (result.jumpToFloor === -1) result.jumpToFloor = f;
         }
       }
       if (conds.onlyMon && info.state.includes(_onlyMonExpectedStr)) {
-        if (info.dValue > 0) result.hasMatchedD = true;
         if (!onlyMatched) {
           onlyMatched = true;
           if (result.jumpToFloor === -1) result.jumpToFloor = f;
@@ -1043,20 +1038,11 @@ function checkElistAndD(searchEngine, conds, searchOnlyWithD, _onlyMonExpectedSt
   if (conds.elist === 'MULTI_SPECIAL') {
     if (specialFloorCount >= 2) {
       elistMatched = true;
-      currentMapSpecials.forEach(s => {
-        if (s.dValue > 0) result.hasMatchedD = true;
-      });
-      if (result.jumpToFloor === -1 && currentMapSpecials.length > 0) result.jumpToFloor = currentMapSpecials[0].f;
+      if (result.jumpToFloor === -1 && currentMapSpecials.length > 0) result.jumpToFloor = currentMapSpecials[0];
     } else {elistMatched = false;}
   }
 
-  if (searchOnlyWithD && !hasAnyD) result.match = false;
   if (!elistMatched || !onlyMatched) result.match = false;
-  if (searchOnlyWithD && result.match) {
-    if ((conds.elist || conds.onlyMon) && conds.elist !== 'MULTI_SPECIAL') {
-      if (!result.hasMatchedD) result.match = false;
-    }
-  }
   return result;
 }
 

@@ -165,13 +165,13 @@
         const id = (sel.from && sel.to) ? sel.from + '>' + sel.to : '';
         const d = state.dist[id];
         if (!id) {
-            result.innerHTML = `<div class="dist-muted">No route shown. Pick From and To, or a table cell.</div>`;
+            result.innerHTML = '';
         } else if (d === Infinity) {
             result.innerHTML = `Distance: <b>unreachable</b>`;
         } else {
             result.innerHTML =
                 `<div>Distance: <b>${fmt(d, 3)}</b> tiles = ${splitText(d)} × √2</div>` +
-                `<div class="dist-muted">DQ9AT A* (tile centres, no corner cutting): ${fmt(state.dq9at[id], 1)}</div>`;
+                `<div class="dist-muted">A* (tile centres, no corner cutting): ${fmt(state.dq9at[id], 1)} <span class="tip" tabindex="0" data-tip="Tile centres, diagonal 1.5, no corner cutting. Only the tile edge is shared 1:1 with the ideal walk; shown for reference only.">ⓘ</span></div>`;
         }
 
         const posRows = pts.map(p => {
@@ -179,7 +179,7 @@
             return `<tr><th style="color:${p.color}">${p.label}</th><td class="dist-name">${p.name}</td>` +
                    `<td>(${p.tx}, ${p.ty})</td><td>${inX.toFixed(3)}</td><td>${inY.toFixed(3)}</td></tr>`;
         }).join("");
-        posTable.innerHTML = `<tr><th></th><th>Name</th><th>Tile</th><th>In-tile X</th><th>In-tile Y</th></tr>${posRows}`;
+        posTable.innerHTML = `<tr><th><span class="tip" tabindex="0" data-tip="In-tile position: bottom-left (0, 0), centre (0.5, 0.5)">ⓘ</span></th><th>Name</th><th>Tile</th><th>In-tile X</th><th>In-tile Y</th></tr>${posRows}`;
 
         const head = pts.map(p => `<th style="color:${p.color}">${p.label}</th>`).join("");
         const rows = pts.map(a => {
@@ -187,7 +187,7 @@
                 const cid = a.key + '>' + b.key;
                 if (a.key === b.key) return `<td class="pick dist-self" data-from="" data-to="" title="No route">–</td>`;
                 const cls = cid === id ? 'pick sel' : 'pick';
-                const tip = `${splitText(state.dist[cid])} | DQ9AT A*: ${fmt(state.dq9at[cid], 1)}`;
+                const tip = `${splitText(state.dist[cid])} | A*: ${fmt(state.dq9at[cid], 1)}`;
                 return `<td class="${cls}" data-from="${a.key}" data-to="${b.key}" title="${tip}">${fmt(state.dist[cid], 2)}</td>`;
             }).join("");
             return `<tr><th style="color:${a.color}">${a.label}</th>${cells}</tr>`;
@@ -199,8 +199,7 @@
             const name = k => (pts.find(p => p.key === k) || { label: '?' }).label;
             const c = r.legs.reduce((s, [f, t]) => s + state.dist[f + '>' + t], 0);
             const stops = [r.legs[0][0]].concat(r.legs.map(l => l[1])).map(name).join(' → ');
-            result.innerHTML = `<div>Search route: <b>${stops}</b> = <b>${fmt(c, 3)}</b> tiles = ${splitText(c)} × √2</div>` +
-                               `<div class="dist-muted">From / To or the table below show a single pair again.</div>`;
+            result.innerHTML = `<div>Search route: <b>${stops}</b> = <b>${fmt(c, 3)}</b> tiles = ${splitText(c)} × √2</div>`;
             drawPath(r.legs.map(([f, t]) => state.path(f + '>' + t)));
         } else {
             drawPath(id ? [state.path(id)] : []);
@@ -214,7 +213,6 @@
             .dist-panel .dist-row { display: flex; gap: 8px 12px; align-items: center; flex-wrap: wrap; }
             .dist-panel select { background: #1e1e1e; border: 1px solid #555; color: #fff; padding: 6px 8px; font-family: monospace; font-size: 16px; }
             .dist-panel .dist-muted { color: #999; }
-            .dist-panel .dist-note { color: #999; font-size: 12px; }
             .dist-table { border-collapse: collapse; }
             .dist-table th, .dist-table td { border: 1px solid #555; padding: 4px 10px; text-align: right; }
             .dist-table td.pick { cursor: pointer; }
@@ -230,20 +228,16 @@
         panel.className = "panel dist-panel";
         panel.innerHTML = `
             <div class="dist-row">
-                <b>Ideal Walk</b><span class="dist-note">horizontal / vertical / 45° steps between 1/16-tile cells, no diagonal past a wall cell, other stairs avoided; unit = one tile edge</span>
+                <b>Ideal Walk</b><span class="tip" tabindex="0" data-tip="Horizontal / vertical / 45° steps between 1/16-tile cells, no diagonal past a wall cell, other stairs avoided. Unit = one tile edge; 1 diagonal step = one tile edge on both x and y. From / To or a table cell picks the pair to draw; None or a – cell hides it. A search route stays until a single pair is picked.">ⓘ</span>
             </div>
             <div class="dist-row">
                 <label for="distFrom">From</label><select id="distFrom"></select>
                 <label for="distTo">To</label><select id="distTo"></select>
             </div>
             <div id="distResult"></div>
-            <div class="dist-note">1 diagonal step = one tile edge on both x and y. Only the tile edge is shared 1:1 with DQ9AT; its diagonal 1.5, no corner cutting and tile centres are a separate rule set, shown for reference only.</div>
             <div class="dist-row dist-tables">
                 <table class="dist-table" id="distTable"></table>
-                <div>
-                    <table class="dist-table" id="distPosTable"></table>
-                    <div class="dist-note">In-tile position: bottom-left (0, 0), centre (0.5, 0.5)</div>
-                </div>
+                <table class="dist-table" id="distPosTable"></table>
             </div>
         `;
         document.querySelector(".panel").after(panel);

@@ -102,7 +102,7 @@
             if (!C.checkOnlyMonPossible(eng, conds)) return null;
             eng.loadFloors();
             if (!C.chestCondsMatch(eng, conds)) return null;
-            const er = C.checkElistAndD(eng, conds, job.searchOnlyWithD, job.onlyMonStr);
+            const er = C.checkElistAndD(eng, conds, job.onlyMonStr);
             if (!er.match) return null;
             let limit = eng.floorCount;
             if (job.mode === 'floor' && er.jumpToFloor !== -1) limit = Math.min(er.jumpToFloor, limit);
@@ -352,7 +352,7 @@
         if (mode === 'map' && !(conds.depth || conds.lv || conds.elist || conds.onlyMon || conds.location || conds.boss)) { alert(MSG.A14); return null; }
         const job = baseJob(conds, C.sharedRankFilter);
         if (!job) return null;
-        return Object.assign(job, { kind: 'fastest', mode, searchOnlyWithD: checked('srchOnlyWithD'), topN: mode === 'floor' ? Infinity : 50 });
+        return Object.assign(job, { kind: 'fastest', mode, topN: mode === 'floor' ? Infinity : 50 });
     }
 
     const qlSec = () => ({ D: null, '5D': 0, '9D': 4 })[val('srchQlMode')];
@@ -488,12 +488,11 @@
         const panel = document.createElement("div");
         panel.className = "panel srch-panel";
         panel.innerHTML = `
-            <div class="srch-row"><b>Ideal Walk Search</b><span class="srch-note">DQ9AT's searches, ranked by the ideal walk</span></div>
+            <div class="srch-row"><b>Ideal Walk Search</b><span class="tip" tabindex="0" data-tip="Searches ranked by the ideal walk. Click a result to see its route floor by floor; click a floor to show it on the map.">ⓘ</span></div>
             <div class="srch-row">
                 <span><input type="checkbox" id="srchAllRanks" checked><label for="srchAllRanks">Search all Ranks</label></span>
                 ${field('Rank', 'srchRank', `<select id="srchRank">${opts(rankOpts)}</select>`)}
                 <span><input type="checkbox" id="srchFilterLoc"><label for="srchFilterLoc">Valid Locations</label></span>
-                <span><input type="checkbox" id="srchOnlyWithD"><label for="srchOnlyWithD">Maps with Flag0</label></span>
             </div>
             <div class="srch-head">Ultimate Search</div>
             <div class="srch-grid">
@@ -515,10 +514,9 @@
                 <span><label for="srchSeedMin">Seed Range (Hex)</label>
                 <input type="text" class="srch-hex" id="srchSeedMin" maxlength="4" placeholder="0000"> -
                 <input type="text" class="srch-hex" id="srchSeedMax" maxlength="4" placeholder="FFFF"></span>
-                <button id="srchGo" data-label="🎯 Search">🎯 Search</button>
+                <button id="srchGo" data-label="Search">Search</button><span class="tip" tabindex="0" data-tip="Fastest Map: entrance to the boss floor (top 50). With Sp.Floor (ElistOfs) or ONLY Monster, Fastest Floor: up to the floor before the special floor (all hits).">ⓘ</span>
             </div>
-            <div class="srch-note">Fastest Map: entrance to the boss floor (top 50). With Sp.Floor (ElistOfs) or ONLY Monster, Fastest Floor: up to the floor before the special floor (all hits).</div>
-            <div class="srch-head">Chest Timer Search</div>
+            <div class="srch-head">Chest Timer Search <span class="tip" tabindex="0" data-tip="B3/B4/B9 Solo･Party / Combo / 3rd Chest (B13:S3). Routes as D / 5D / 9D; all hits, sorted by the ideal walk. Ultimate Search conditions above also apply.">ⓘ</span></div>
             <div class="srch-row">
                 <select id="srchQlMode"><option value="D">D</option><option value="5D">5D</option><option value="9D">9D</option></select>
                 <select id="srchItem">${items}</select>
@@ -526,7 +524,6 @@
                 <button id="srchCombo" data-label="Combo">Combo</button>
                 <button id="srch3rd" data-label="3rd">3rd</button>
             </div>
-            <div class="srch-note">B3/B4/B9 Solo･Party / Combo / 3rd Chest (B13:S3). Routes as DQ9AT's D / 5D / 9D; all hits, sorted by the ideal walk. Ultimate Search conditions above also apply.</div>
             <div class="srch-note" id="srchStatus"></div>
             <table class="srch-table" id="srchResults"></table>
         `;
@@ -554,7 +551,7 @@
                 running.btn = btn;
                 running.promise.then(res => {
                     const items = job.kind === 'item' ? shapeItems(res.items, job.preset) : res.items;
-                    setStatus(`Done: ${res.hits} Found (${((Date.now() - t0) / 1000).toFixed(1)} s). Click a result for its route.`);
+                    setStatus(`Done: ${res.hits} Found (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
                     shown = { job, items };
                     if (job.kind === 'item') renderItemResults(items); else renderFastestResults(items);
                 }).catch(err => setStatus("Error: " + err.message))

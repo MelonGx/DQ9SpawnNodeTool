@@ -18,6 +18,11 @@
         .app.stacked .map-pin { display: block; margin: 4px auto 0; background: #2d2d2d; border: 1px solid #555; color: #d4d4d4;
                                 font-family: monospace; font-size: 14px; padding: 4px 12px; border-radius: 4px; }
         html { -webkit-text-size-adjust: 100%; }
+        .tip { position: relative; display: inline-block; margin-left: 4px; color: #888; cursor: help; font-weight: normal; font-size: 14px; }
+        .tip:hover, .tip:focus { color: #fff; outline: none; }
+        .tip-box { position: absolute; display: none; z-index: 20; max-width: min(320px, calc(100vw - 16px)); box-sizing: border-box;
+            text-align: left; background: #111; color: #ddd; border: 1px solid #555; border-radius: 4px; padding: 6px 8px;
+            font-family: monospace; font-size: 12px; line-height: 1.4; pointer-events: none; }
         @media (max-width: 600px) {
             body { padding: 8px; }
             .app-side > .panel { padding: 10px; }
@@ -78,5 +83,23 @@
         if (short) return h - 20;
         return Math.max(320, Math.min(1024, h - 20, w - SIDE_MIN - GAP));
     };
+    const tipBox = document.createElement("div");
+    tipBox.className = "tip-box";
+    document.body.append(tipBox);
+    const showTip = el => {
+        tipBox.textContent = el.dataset.tip;
+        tipBox.style.display = "block";
+        const r = el.getBoundingClientRect(), vw = document.documentElement.clientWidth;
+        const x = Math.max(8, Math.min(r.left, vw - tipBox.offsetWidth - 8));
+        tipBox.style.left = `${x + window.scrollX}px`;
+        tipBox.style.top = `${r.bottom + 4 + window.scrollY}px`;
+    };
+    const hideTip = () => { tipBox.style.display = "none"; };
+    const tipOf = e => e.target.closest && e.target.closest(".tip");
+    document.addEventListener("mouseover", e => { const t = tipOf(e); if (t) showTip(t); });
+    document.addEventListener("mouseout", e => { const t = tipOf(e); if (t && document.activeElement !== t) hideTip(); });
+    document.addEventListener("focusin", e => { const t = tipOf(e); if (t) showTip(t); });
+    document.addEventListener("focusout", e => { if (tipOf(e)) hideTip(); });
+
     scaleRenderedOutput();
 })();
