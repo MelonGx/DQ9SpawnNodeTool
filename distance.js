@@ -291,8 +291,7 @@
             const a = state.straight[id], b = state.diag[id];
             result.innerHTML =
                 `<div>距離：<b>${fmt(d, 3)}</b> 格 ＝ 直走 ${a.toFixed(3)} 格 ＋ 斜走 ${b.toFixed(3)} 步 × √2</div>` +
-                `<div class="dist-muted">同一路徑以斜走 ${DQ9AT_DIAG} 計：${(a + DQ9AT_DIAG * b).toFixed(3)}　｜　` +
-                `DQ9AT A*（方格中心、禁切角）：${fmt(state.dq9at[id], 1)}</div>`;
+                `<div class="dist-muted">DQ9AT A*（方格中心、禁切角）：${fmt(state.dq9at[id], 1)}</div>`;
         }
 
         // In-tile position: bottom-left of the tile is (0, 0), centre is (0.5, 0.5)
