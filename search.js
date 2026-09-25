@@ -443,12 +443,12 @@
             .srch-panel select, .srch-panel button { background: #1e1e1e; border: 1px solid #555; color: #fff; padding: 6px 8px; font-family: monospace; font-size: 16px; max-width: 100%; }
             .srch-panel button { cursor: pointer; }
             .srch-panel input.srch-hex { width: 70px; text-transform: uppercase; }
-            .srch-panel .srch-note { color: #999; font-size: 12px; }
+            .srch-panel .srch-note { color: #999; }
             .srch-panel .srch-head { color: #fff; font-weight: bold; }
             .srch-panel input[type=checkbox] { width: auto; margin: 0; }
             .srch-panel .srch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); align-items: end; gap: 6px 10px; width: 100%; }
             .srch-panel .srch-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-            .srch-panel .srch-cell > label { color: #aaa; font-size: 13px; text-align: left; justify-self: start; }
+            .srch-panel .srch-cell > label { color: #aaa; text-align: left; justify-self: start; }
             .srch-panel .srch-cell select, .srch-panel .srch-cell input { width: 100%; box-sizing: border-box; min-width: 0; }
             .srch-panel .srch-boxes { display: flex; flex-wrap: wrap; gap: 4px 8px; }
             .srch-panel .srch-boxes label { display: inline-flex; gap: 3px; align-items: center; }
@@ -459,7 +459,7 @@
             .srch-table td.srch-left { text-align: left; }
             .srch-table tr.srch-pick { cursor: pointer; }
             .srch-table tr.srch-pick:hover { background: #3a3a3a; }
-            .srch-table .srch-floors { color: #999; font-size: 12px; text-align: left; }
+            .srch-table .srch-floors { color: #999; text-align: left; }
             .srch-table tr.srch-route td { background: #252525; line-height: 2; }
             .srch-table .srch-stop { display: inline-block; border: 1px solid #555; padding: 0 6px; margin: 2px 2px; cursor: pointer; white-space: nowrap; }
             .srch-table .srch-stop:hover { background: #3a3a3a; }

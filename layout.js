@@ -16,26 +16,23 @@
         .app.stacked .app-side { width: 100%; }
         .map-pin { display: none; }
         .app.stacked .map-pin { display: block; margin: 4px auto 0; background: #2d2d2d; border: 1px solid #555; color: #d4d4d4;
-                                font-family: monospace; font-size: 14px; padding: 4px 12px; border-radius: 4px; }
+                                font-family: monospace; font-size: 16px; padding: 4px 12px; border-radius: 4px; }
         html { -webkit-text-size-adjust: 100%; }
-        .tip { position: relative; display: inline-block; margin-left: 4px; color: #888; cursor: help; font-weight: normal; font-size: 14px; }
+        .tip { position: relative; display: inline-block; margin-left: 4px; color: #888; cursor: help; font-weight: normal; }
         .tip:hover, .tip:focus { color: #fff; outline: none; }
         .tip-box { position: absolute; display: none; z-index: 20; max-width: min(320px, calc(100vw - 16px)); box-sizing: border-box;
             text-align: left; background: #111; color: #ddd; border: 1px solid #555; border-radius: 4px; padding: 6px 8px;
-            font-family: monospace; font-size: 12px; line-height: 1.4; pointer-events: none; }
+            font-family: monospace; line-height: 1.4; pointer-events: none; }
         @media (max-width: 600px) {
             body { padding: 8px; }
             .app-side > .panel { padding: 10px; }
             .srch-panel .srch-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-            .srch-table { font-size: 13px; }
             .srch-table th, .srch-table td { padding: 3px 5px; }
         }
         @media (pointer: fine) {
             .app-side .srch-panel, .app-side .dist-panel { gap: 6px; }
             .app-side .srch-panel select, .app-side .srch-panel input, .app-side .srch-panel button,
-            .app-side .dist-panel select { font-size: 13px; padding: 2px 4px; }
-            .app-side .srch-panel label, .app-side .dist-panel label { font-size: 13px; }
-            .app-side .srch-panel .srch-cell > label { font-size: 12px; }
+            .app-side .dist-panel select { padding: 2px 4px; }
             .app-side .srch-panel .srch-grid { gap: 3px 8px; }
             .app-side .srch-panel .srch-boxes input.srch-box { width: 32px; padding: 1px 3px; }
             .app-side .srch-panel .srch-row input.srch-hex { width: 52px; }
