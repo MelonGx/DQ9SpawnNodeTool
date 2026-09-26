@@ -50,7 +50,7 @@
                 context: ctx,
                 stairs: [[0, true, st.up, ctx.upStairs], [1, false, st.down, ctx.downStairs]]
                     .filter(([, , c, tile]) => c && tile).map(([k, up, c, tile]) => ({ k, up, shape: up ? walk.stairsShape(c, tile, tkg.grid) : null })),
-                info: { grid: tkg.grid, width: tkg.width, height: tkg.height, bitfield: tkg.bitfield, env: tkg.envIndices[envName] },
+                info: { grid: tkg.grid, width: tkg.width, height: tkg.height, bitfield: tkg.bitfield },
             };
         }
 
@@ -250,7 +250,7 @@
     get grid() { return mapGrid; }, get width() { return mapWidth; }, get height() { return mapHeight; },
     get bitfield() { return bitfieldGrid; }, get context() { return mapContext; },
     getEnvironment, envIndices, calculateStairsCoords, calculateChestCoords, modifiers, exceptions, LCG,
-    tileMap, TILE_WALL, TILE_DIVIDER,
+    TILE_WALL, TILE_DIVIDER,
 };\n}\n`;
     }
 

@@ -1,5 +1,5 @@
 (function () {
-    const walk = createIdealWalk(16, { TILE_WALL, TILE_DIVIDER, tileMap });
+    const walk = createIdealWalk(16, { TILE_WALL, TILE_DIVIDER });
     const TILE = walk.TILE;
     const PX_PER_TILE = 64;
     const SVG_NS = "http://www.w3.org/2000/svg";
@@ -67,8 +67,7 @@
 
     function recompute() {
         if (!mapContext) { state = null; return; }
-        walk.setFloor({ grid: mapGrid, width: mapWidth, height: mapHeight, bitfield: bitfieldGrid,
-                        env: envIndices[getEnvironment(mapContext.field_0.mapseed)] });
+        walk.setFloor({ grid: mapGrid, width: mapWidth, height: mapHeight, bitfield: bitfieldGrid });
         const points = collectPoints();
         const stairs = ['up', 'down'].flatMap(key => {
             const k = points.findIndex(p => p.key === key);
@@ -232,7 +231,7 @@
         panel.className = "panel dist-panel";
         panel.innerHTML = `
             <div class="dist-row">
-                <b>Ideal Walk</b><span class="tip" tabindex="0" data-tip="The character (2×2px) moves 1px (1/16 tile) at a time, horizontally, vertically or at 45°, never with any part on a wall px, and never diagonally past a wall. The up stairs (2px wide, 4px deep, right behind its point) and the down stairs (a square 8/3px wide, centred on its point) are walls. Walks from the up stairs start with the character right in front of it, even on a chest; once it moves, every chest (2×2px) is a wall, which it can only leave, never enter. A walk to a chest ends touching one of its sides (never only a corner); a walk from a chest leaves from such a spot. Unit = one tile edge; 1 diagonal step = one tile edge on both x and y. From / To or a table cell picks the pair to draw; None or a – cell hides it. A search route stays until a single pair is picked.">ⓘ</span>
+                <b>Ideal Walk</b><span class="tip" tabindex="0" data-tip="Walls reach 4px in from each wall side of a tile (and 4×4px at a wall corner), so a corridor is 8px wide. The character (2×2px) moves 1px (1/16 tile) at a time, horizontally, vertically or at 45°, never with any part on a wall, and never diagonally past a wall. The up stairs (2px wide, 4px deep, right behind its point) and the down stairs (a square 8/3px wide, centred on its point) are walls. Walks from the up stairs start with the character right in front of it, even on a chest; once it moves, every chest (2×2px) is a wall, which it can only leave, never enter. A walk to a chest ends touching one of its sides (never only a corner); a walk from a chest leaves from such a spot. Unit = one tile edge; 1 diagonal step = one tile edge on both x and y. From / To or a table cell picks the pair to draw; None or a – cell hides it. A search route stays until a single pair is picked.">ⓘ</span>
             </div>
             <div class="dist-row">
                 <label for="distFrom">From</label><select id="distFrom"></select>
