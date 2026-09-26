@@ -43,7 +43,7 @@
             .dist-table td.pick { padding-top: 8px; padding-bottom: 8px; }
         }
     `;
-    document.head.appendChild(style);
+    document.body.appendChild(style);
 
     const app = document.createElement("div");
     app.className = "app";

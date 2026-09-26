@@ -471,7 +471,7 @@
             .srch-table .srch-stop:hover { background: #3a3a3a; }
             .srch-table .srch-stop.on { background: #6a206a; color: #fff; }
         `;
-        document.head.appendChild(style);
+        document.body.appendChild(style);
 
         const opts = list => list.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
         const named = (obj, i1, i2) => Object.keys(obj).map(k => [k, `${obj[k][i1]} ${obj[k][i2]}`]);

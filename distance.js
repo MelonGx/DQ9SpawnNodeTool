@@ -226,7 +226,7 @@
             .dist-table td.dist-name { text-align: left; }
             .dist-panel .dist-tables { align-items: flex-start; gap: 16px; }
         `;
-        document.head.appendChild(style);
+        document.body.appendChild(style);
 
         const panel = document.createElement("div");
         panel.className = "panel dist-panel";
