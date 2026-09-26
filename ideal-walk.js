@@ -304,14 +304,17 @@ function createIdealWalk(px = 16, tkg) {
     };
 
     const isStairs = (stairs, j) => (stairs || []).some(s => s.k === j);
-    const chestPixels = p => { const x = Math.floor(p.x / 0x1000) * 2, y = Math.floor(p.y / 0x1000) * 2; return [[x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]]; };
+    const overlap1 = (a, c) => Math.max(0, Math.min(a + FOOT, c + 1) - Math.max(a, c - 1));
 
     function legSetup(points, stairs, src, dst) {
-        const N = freeW * freeH, hard = new Uint8Array(N), chest = new Uint8Array(N);
-        points.forEach((p, j) => {
-            if (!p || isStairs(stairs, j)) return;
-            for (const px of chestPixels(p)) for (const i of footprintsOver([px])) chest[i]++;
-        });
+        const N = freeW * freeH, hard = new Uint8Array(N), chest = new Float64Array(N);
+        const boxes = points.flatMap((p, j) => p && !isStairs(stairs, j) ? [[p.x / CELL, p.y / CELL]] : []);
+        for (const [cx, cy] of boxes) {
+            for (let y = Math.ceil(cy - 1 - FOOT); y < cy + 1; y++) for (let x = Math.ceil(cx - 1 - FOOT); x < cx + 1; x++) {
+                const i = posIndex(x, y);
+                if (i >= 0) chest[i] += overlap1(x, cx) * overlap1(y, cy);
+            }
+        }
         let starts = null;
         for (const s of stairs || []) {
             if (s.k === dst || (s.k === src && !s.up)) continue;
@@ -329,10 +332,10 @@ function createIdealWalk(px = 16, tkg) {
         const goals = j => {
             const p = points[j];
             if (isStairs(stairs, j)) return footprintsOver([[pxOf(p.x), pxOf(p.y)]]).filter(standing);
-            const [[x, y]] = chestPixels(p), out = [];
-            for (let k = 1 - FOOT; k <= 1; k++) {
-                out.push(posIndex(x - FOOT, y + k), posIndex(x + 2, y + k), posIndex(x + k, y - FOOT), posIndex(x + k, y + 2));
-            }
+            const cx = p.x / CELL, cy = p.y / CELL, out = [];
+            const lo = c => Math.floor(c - 1 - FOOT) + 1, hi = c => Math.ceil(c + 1) - 1;
+            for (let k = lo(cy); k <= hi(cy); k++) out.push(posIndex(Math.floor(cx - 1 - FOOT), k), posIndex(Math.ceil(cx + 1), k));
+            for (let k = lo(cx); k <= hi(cx); k++) out.push(posIndex(k, Math.floor(cy - 1 - FOOT)), posIndex(k, Math.ceil(cy + 1)));
             return [...new Set(out)].filter(standing);
         };
         if (!starts) starts = goals(src);
