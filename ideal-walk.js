@@ -342,6 +342,7 @@ function createIdealWalk(px = 16, tkg) {
         const standing = i => i >= 0 && free[i] === 1 && !hard[i] && !chest[i];
         const goals = j => {
             const p = points[j];
+            if (stairs.some(s => s.k === j && !s.up)) return positionsOver(around(p, DOWN_HALF)).filter(standing);
             if (isStairs(stairs, j)) {
                 const x = p.x / CELL, y = p.y / CELL, out = [];
                 for (let gy = Math.floor(y - FOOT) + 1; gy <= Math.floor(y); gy++) for (let gx = Math.floor(x - FOOT) + 1; gx <= Math.floor(x); gx++) out.push(posIndex(gx, gy));
