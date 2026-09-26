@@ -99,10 +99,10 @@
     }
 
     function split(len) {
-        const steps = len * 16;
+        const steps = len * walk.GRID;
         for (let b = 0; b * Math.SQRT2 <= steps + 1e-9; b++) {
             const a = steps - b * Math.SQRT2;
-            if (Math.abs(a - Math.round(a)) < 1e-6) return [Math.round(a) / 16, b / 16];
+            if (Math.abs(a - Math.round(a)) < 1e-6) return [Math.round(a) / walk.GRID, b / walk.GRID];
         }
         return [NaN, NaN];
     }
@@ -232,7 +232,7 @@
         panel.className = "panel dist-panel";
         panel.innerHTML = `
             <div class="dist-row">
-                <b>Ideal Walk</b><span class="tip" tabindex="0" data-tip="Walls are the dark wall lines TKG draws. The character (2×2px) moves 1px (1/16 tile) at a time, horizontally, vertically or at 45°; its body may reach only the first px of a wall line, its centre never leaves the floor, and it never goes diagonally past a wall. The up stairs (2px wide, 4px deep, right behind its point) and the down stairs (a square 8/3px wide, centred on its point) are walls. Walks from the up stairs start with the character right in front of it, even on a chest; once it moves, every chest (2×2px) is a wall, which it can only leave, never enter. A walk to a chest ends touching one of its sides (never only a corner); a walk from a chest leaves from such a spot. Unit = one tile edge; 1 diagonal step = one tile edge on both x and y. From / To or a table cell picks the pair to draw; None or a – cell hides it. A search route stays until a single pair is picked.">ⓘ</span>
+                <b>Ideal Walk</b><span class="tip" tabindex="0" data-tip="Walls are the dark wall lines TKG draws; a corridor is 6px wide. The character (1.5×1.5px, 1/4 of a corridor) moves 0.5px at a time, horizontally, vertically or at 45°; its centre stays on the floor, its body may reach only the first px of a wall line, and it never goes diagonally past a wall. The up stairs (1.5px wide, 3px deep, right behind its point) and the down stairs (a 2px square, 1/3 of a corridor, centred on its point) are walls. Walks from the up stairs start with the character right in front of it, even on a chest; once it moves, every chest (1.5×1.5px, centred on its point) is a wall, which it can only leave, never enter. A walk to a chest ends touching one of its sides (never only a corner); a walk from a chest leaves from such a spot. Unit = one tile edge; 1 diagonal step = one tile edge on both x and y. From / To or a table cell picks the pair to draw; None or a – cell hides it. A search route stays until a single pair is picked.">ⓘ</span>
             </div>
             <div class="dist-row">
                 <label for="distFrom">From</label><select id="distFrom"></select>

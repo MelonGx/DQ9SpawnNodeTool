@@ -57,7 +57,7 @@
         const LB_SLACK = 2 * 4 / 16;
         const upFront = fd => {
             const s = fd.stairs.find(s => s.up);
-            return s && { x: (s.shape.front[0][0] + s.shape.front[1][0] + 1) / 2 * 0x800, y: (s.shape.front[0][1] + s.shape.front[1][1] + 1) / 2 * 0x800 };
+            return s && { x: (s.shape.front.x0 + s.shape.front.x1) / 2 * 0x800, y: (s.shape.front.y0 + s.shape.front.y1) / 2 * 0x800 };
         };
         function costRow(fd, i, exact) {
             const row = fd.points.map(() => Infinity);
