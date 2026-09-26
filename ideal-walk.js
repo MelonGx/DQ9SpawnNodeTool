@@ -304,7 +304,8 @@ function createIdealWalk(px = 16, tkg) {
     };
 
     const isStairs = (stairs, j) => (stairs || []).some(s => s.k === j);
-    const overlap1 = (a, c) => Math.max(0, Math.min(a + FOOT, c + 1) - Math.max(a, c - 1));
+    const overlap1 = (a, c, r = 1) => Math.max(0, Math.min(a + FOOT, c + r) - Math.max(a, c - r));
+    const DOWN_HALF = 4 / 3;
 
     function legSetup(points, stairs, src, dst) {
         const N = freeW * freeH, hard = new Uint8Array(N), chest = new Float64Array(N);
@@ -318,6 +319,14 @@ function createIdealWalk(px = 16, tkg) {
         let starts = null;
         for (const s of stairs || []) {
             if (s.k === dst || (s.k === src && !s.up)) continue;
+            if (!s.up) {
+                const cx = points[s.k].x / CELL, cy = points[s.k].y / CELL;
+                for (let y = Math.ceil(cy - DOWN_HALF - FOOT); y < cy + DOWN_HALF; y++) for (let x = Math.ceil(cx - DOWN_HALF - FOOT); x < cx + DOWN_HALF; x++) {
+                    const i = posIndex(x, y);
+                    if (i >= 0 && overlap1(x, cx, DOWN_HALF) * overlap1(y, cy, DOWN_HALF) > 0) hard[i] = 1;
+                }
+                continue;
+            }
             for (const i of footprintsOver(s.shape.body)) hard[i] = 1;
             if (s.k === src) starts = footprintsOver(s.shape.front).filter(i => free[i] === 1 && !s.shape.body.some(b => covers(i, b)));
         }
