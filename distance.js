@@ -4,12 +4,24 @@
     const PX_PER_TILE = 64;
     const SVG_NS = "http://www.w3.org/2000/svg";
     const PATH_COLOR = "#ff00ff";
+    const S = walk.SIZES, px = v => `${+v.toFixed(2)}px`, part = v => `1/${S.corridor / v} of a corridor`;
+    const WALK_TIP = `Walls are the dark wall lines TKG draws; a corridor is ${px(S.corridor)} wide. ` +
+        `The character (${px(S.char)} × ${px(S.char)}, ${part(S.char)}) moves ${px(S.step)} at a time, horizontally, vertically or at 45°; ` +
+        `its centre stays on the floor, its body may reach only the first px of a wall line, and it never goes diagonally past a wall. ` +
+        `The up stairs (${px(S.upWidth)} wide, ${px(S.upDepth)} deep, right behind its point) and the down stairs ` +
+        `(a ${px(S.down)} square, ${part(S.down)}, centred on its point) are walls. ` +
+        `Walks from the up stairs start with the character right in front of it, even on a chest; once it moves, ` +
+        `every chest (${px(S.chest)} × ${px(S.chest)}, centred on its point) is a wall, which it can only leave, never enter. ` +
+        `A walk to a chest ends touching one of its sides (never only a corner); a walk from a chest leaves from such a spot. ` +
+        `A walk to the down stairs ends as soon as the character steps onto it, from any direction. ` +
+        `Unit = one tile edge; 1 diagonal step = one tile edge on both x and y. ` +
+        `From / To or a table cell picks the pair to draw; None or a – cell hides it. A search route stays until a single pair is picked.`;
 
     let state = null;
     let sel = { from: 'up', to: 'down' };
     let route = null;
 
-    const isWalkableTile = (tx, ty) => ![TILE_WALL, TILE_DIVIDER, -1].includes(FUN_02092934(mapContext, tx, ty));
+    const isWalkableTile = (tx, ty) => walk.isOpenTile(mapGrid, tx, ty);
 
     const DQ9AT_DIAG = 1.5;
     function dq9atStepCost(sx, sy, tx, ty) {
@@ -222,7 +234,7 @@
         panel.className = "panel dist-panel";
         panel.innerHTML = `
             <div class="dist-row">
-                <b>Ideal Walk</b><span class="tip" tabindex="0" data-tip="Walls are the dark wall lines TKG draws; a corridor is 6px wide. The character (1.5×1.5px, 1/4 of a corridor) moves 0.5px at a time, horizontally, vertically or at 45°; its centre stays on the floor, its body may reach only the first px of a wall line, and it never goes diagonally past a wall. The up stairs (1.5px wide, 3px deep, right behind its point) and the down stairs (a 2px square, 1/3 of a corridor, centred on its point) are walls. Walks from the up stairs start with the character right in front of it, even on a chest; once it moves, every chest (1.5×1.5px, centred on its point) is a wall, which it can only leave, never enter. A walk to a chest ends touching one of its sides (never only a corner); a walk from a chest leaves from such a spot. A walk to the down stairs ends as soon as the character steps onto it, from any direction. Unit = one tile edge; 1 diagonal step = one tile edge on both x and y. From / To or a table cell picks the pair to draw; None or a – cell hides it. A search route stays until a single pair is picked.">ⓘ</span>
+                <b>Ideal Walk</b><span class="tip" tabindex="0" data-tip="${WALK_TIP}">ⓘ</span>
             </div>
             <div class="dist-row">
                 <label for="distFrom">From</label><select id="distFrom"></select>

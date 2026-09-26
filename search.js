@@ -42,7 +42,6 @@
             }));
         }
 
-        const LB_SLACK = 2 * 4 / 16;
         function costRow(fd, i, exact) {
             const row = fd.points.map(() => Infinity);
             if (fd.points[i]) {
@@ -55,7 +54,7 @@
                     tileWalk.setFloorTiles(fd.info);
                     const valid = fd.points.map((p, j) => (j === i && j === 0 && fd.upFront) || p || { x: 0, y: 0 });
                     const d = tileWalk.shortest(valid, i, cols);
-                    for (const j of cols) row[j] = j === i ? 0 : Math.max(0, d[j] - LB_SLACK);
+                    for (const j of cols) row[j] = j === i ? 0 : Math.max(0, d[j] - walk.LB_SLACK);
                 }
             }
             return row;
@@ -83,7 +82,7 @@
             const c = cost(eng.seed, f, i, j, true);
             return c === Infinity ? null : c;
         }
-        const C = DQ9AT_CORE({ tkg, floor: floorOf, calcPointWalkCost: idealPointWalkCost });
+        const C = DQ9AT_CORE({ tkg, floor: floorOf, calcPointWalkCost: idealPointWalkCost, isOpenTile: walk.isOpenTile });
 
         function fastestHit(eng, job, seed, r) {
             const conds = job.conds;
@@ -182,7 +181,7 @@
         }
 
         let captured = [];
-        const CR = DQ9AT_CORE({ tkg, floor: floorOf, calcPointWalkCost: idealPointWalkCost, onRoute: w => captured.push(w) });
+        const CR = DQ9AT_CORE({ tkg, floor: floorOf, calcPointWalkCost: idealPointWalkCost, isOpenTile: walk.isOpenTile, onRoute: w => captured.push(w) });
         function routeOf(job, item) {
             let legs;
             if (job.kind === 'fastest') {

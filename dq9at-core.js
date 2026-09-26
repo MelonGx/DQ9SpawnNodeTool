@@ -502,7 +502,7 @@ function getMonsterDisplayName(hx) {
 }
 
 function elistTileStats(floor) {
-  const open = (x, y) => floor.grid[y][x] !== tkg.TILE_WALL && floor.grid[y][x] !== tkg.TILE_DIVIDER;
+  const open = (x, y) => overrides.isOpenTile(floor.grid, x, y);
   let W = 0, X = 0;
   let wtCount = 0;
 

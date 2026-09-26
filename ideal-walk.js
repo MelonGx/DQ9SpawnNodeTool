@@ -4,7 +4,11 @@ function createIdealWalk(px = 16, tkg) {
     const SUB = px > 1 ? 2 : 1;
     const GRID = px * SUB;
     const CELL = TILE / GRID;
-    const CHAR = 1.5, DOWN_HALF = 1, CHEST_HALF = 0.75, UP_WIDTH = 1.5, UP_DEPTH = 3;
+    const CORRIDOR = 6;
+    const CHAR = CORRIDOR / 4, DOWN_HALF = CORRIDOR / 3 / 2, CHEST_HALF = CHAR / 2, UP_WIDTH = CHAR, UP_DEPTH = 2 * CHAR;
+    const SIZES = { corridor: CORRIDOR, char: CHAR, down: 2 * DOWN_HALF, chest: 2 * CHEST_HALF, upWidth: UP_WIDTH, upDepth: UP_DEPTH, step: 1 / SUB };
+    const LB_SLACK = 2 * Math.SQRT2 * (CHEST_HALF + CHAR + 1 / SUB) / PX;
+    const toPx = v => v * PX / TILE, fromPx = v => v * TILE / PX;
     const FOOT = px > 1 ? CHAR * SUB : 1;
     const DIAG_EXTRA = Math.SQRT2 - 1;
 
@@ -15,7 +19,7 @@ function createIdealWalk(px = 16, tkg) {
         return cx >= 0 && cy >= 0 && cx < freeW && cy < freeH && free[cy * freeW + cx] === 1;
     }
 
-    const isWalkableTile = (grid, tx, ty) => grid[ty][tx] !== tkg.TILE_WALL && grid[ty][tx] !== tkg.TILE_DIVIDER;
+    const isOpenTile = (grid, tx, ty) => { const t = grid[ty] && grid[ty][tx]; return t !== undefined && t !== tkg.TILE_WALL && t !== tkg.TILE_DIVIDER; };
 
     function octileSteps(dx, dy) {
         dx = Math.abs(dx); dy = Math.abs(dy);
@@ -191,7 +195,7 @@ function createIdealWalk(px = 16, tkg) {
         };
         for (let ty = 0; ty < mapHeight; ty++) {
             for (let tx = 0; tx < mapWidth; tx++) {
-                if (!isWalkableTile(grid, tx, ty)) continue;
+                if (!isOpenTile(grid, tx, ty)) continue;
                 const v = masks[ty * mapWidth + tx], x0 = tx * PX, y0 = ty * PX;
                 for (let k = 0; k < PX; k++) {
                     if (!(v & 0x40)) pushFloor(x0 + k, y0);
@@ -233,7 +237,7 @@ function createIdealWalk(px = 16, tkg) {
         const { grid, width, height } = map;
         free = new Uint8Array(width * height);
         for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) free[y * width + x] = isWalkableTile(grid, x, y) ? 1 : 0;
+            for (let x = 0; x < width; x++) free[y * width + x] = isOpenTile(grid, x, y) ? 1 : 0;
         }
         freeW = width; freeH = height;
         corners = null;
@@ -290,10 +294,10 @@ function createIdealWalk(px = 16, tkg) {
     }
 
     function stairsShape(fine, tile, grid) {
-        const solid = (x, y) => { const t = grid[y] && grid[y][x]; return t === undefined || t === tkg.TILE_WALL || t === tkg.TILE_DIVIDER; };
+        const solid = (x, y) => !isOpenTile(grid, x, y);
         const [dx, dy] = !solid(tile.x, tile.y + 1) ? [0, 1] : !solid(tile.x + 1, tile.y) ? [1, 0]
             : !solid(tile.x - 1, tile.y) ? [-1, 0] : !solid(tile.x, tile.y - 1) ? [0, -1] : [0, 1];
-        const d = dx || dy, ux = fine.x * 2, uz = fine.z * 2;
+        const d = dx || dy, ux = toPx(fine.x * 0x1000), uz = toPx(fine.z * 0x1000);
         const box = (a0, a1) => {
             const [lo, hi] = a0 < a1 ? [a0, a1] : [a1, a0];
             return dx ? { x0: ux + lo, x1: ux + hi, y0: uz - UP_WIDTH / 2, y1: uz + UP_WIDTH / 2 }
@@ -315,7 +319,7 @@ function createIdealWalk(px = 16, tkg) {
         }
         return out;
     }
-    const around = (p, h) => { const x = p.x / CELL / SUB, y = p.y / CELL / SUB; return { x0: x - h, x1: x + h, y0: y - h, y1: y + h }; };
+    const around = (p, h) => { const x = toPx(p.x), y = toPx(p.y); return { x0: x - h, x1: x + h, y0: y - h, y1: y + h }; };
     const isStairs = (stairs, j) => (stairs || []).some(s => s.k === j);
 
     function legSetup(points, stairs, src, dst) {
@@ -534,9 +538,9 @@ function createIdealWalk(px = 16, tkg) {
             info: { grid: f.grid, width: f.width, height: f.height, bitfield: f.bitfield, env: f.env },
             points, stairs,
             tiles: [f.upTile, f.downTile].concat(f.chestTiles),
-            upFront: front ? { x: (front.x0 + front.x1) / 2 * TILE / 16, y: (front.y0 + front.y1) / 2 * TILE / 16 } : null,
+            upFront: front ? { x: fromPx((front.x0 + front.x1) / 2), y: fromPx((front.y0 + front.y1) / 2) } : null,
         };
     }
 
-    return { TILE, GRID, setFloor, setFloorTiles, gridFrom, gridPath, shortest, floorModel };
+    return { TILE, GRID, SIZES, LB_SLACK, isOpenTile, setFloor, setFloorTiles, gridFrom, gridPath, shortest, floorModel };
 }
