@@ -1,5 +1,5 @@
 (function () {
-    const walk = createIdealWalk(16, { TILE_WALL, TILE_DIVIDER, tileMap, modifiers, exceptions });
+    const walk = createIdealWalk(16, { TILE_WALL, TILE_DIVIDER, tileMap });
     const TILE = walk.TILE;
     const PX_PER_TILE = 64;
     const SVG_NS = "http://www.w3.org/2000/svg";

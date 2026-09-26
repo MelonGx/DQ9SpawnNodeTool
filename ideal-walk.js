@@ -517,19 +517,9 @@ function createIdealWalk(px = 16, tkg) {
             '33': ['88588888875888888748888845488888447888888458888888888888888888888888888888888888888888888888884488888747888887588888875888888788', '24448888745488884445888844488888475888885488888845888888588888888888888788888874888887478888845488888444888874448888774588884446', '88588888875888888848888858488888445888888888888888888888888888888888888888888888888888888888884488888857888887888888875888888788', '88588888885888888758888874588888448888888888888888888888888888888888888888888888888888888888884488888744888887588888875888888758', '28588888885888888758888887888888458888888888888888888888888888888888888888888888888888888888887488888848888887588888878888888786'],
     };
 
-    const offsets = tkg.modifiers ? [...new Set(tkg.modifiers.concat(Object.values(tkg.exceptions)).map(m => m.x))] : [];
-    function exactCoord(fine, tile) {
-        const base = tile * 8 + 4, off = offsets.find(v => (v >> 12) === fine - base);
-        return off === undefined ? null : base * 0x1000 + off;
-    }
-
     function floorModel(f) {
-        const exact = (c, tile) => {
-            if (!c || !tile) return null;
-            const x = exactCoord(c.x, tile.x), y = exactCoord(c.z, tile.y);
-            return x === null || y === null ? null : { x, y };
-        };
-        const points = [exact(f.up, f.upTile), exact(f.down, f.downTile)].concat(f.chests.map((c, i) => exact(c, f.chestTiles[i])));
+        const at = (c, tile) => c && tile ? { x: c.x * 0x1000, y: c.z * 0x1000 } : null;
+        const points = [at(f.up, f.upTile), at(f.down, f.downTile)].concat(f.chests.map((c, i) => at(c, f.chestTiles[i])));
         const stairs = [];
         if (points[0]) stairs.push({ k: 0, up: true, shape: stairsShape(f.up, f.upTile, f.grid) });
         if (points[1]) stairs.push({ k: 1, up: false });

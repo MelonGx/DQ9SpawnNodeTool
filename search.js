@@ -232,7 +232,7 @@
     generate: (seed, floor1) => FUN_02090444(seed, floor1),
     get grid() { return mapGrid; }, get width() { return mapWidth; }, get height() { return mapHeight; },
     get bitfield() { return bitfieldGrid; }, get context() { return mapContext; },
-    getEnvironment, envIndices, calculateStairsCoords, calculateChestCoords, modifiers, exceptions, LCG,
+    getEnvironment, envIndices, calculateStairsCoords, calculateChestCoords, LCG,
     tileMap, TILE_WALL, TILE_DIVIDER,
 };\n}\n`;
     }
