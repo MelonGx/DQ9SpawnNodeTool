@@ -138,10 +138,9 @@
             if (job.kind === 'fastest') job.onlyMonStr = C.buildOnlyMonExpectedStr(job.conds);
             const topN = job.topN;
             const ranks = job.ranks.map((rank, ri) => ({ rank, ri, rStr: C.hex2(rank), key: C.resolveRankKey(C.hex2(rank), rank) }));
-            const total = (job.endSeed - job.startSeed + 1) * ranks.length;
             let processed = 0, hits = 0, lastPost = Date.now();
             const top = [];
-            const bound = () => (top.length >= topN ? top[top.length - 1].cost : Infinity);
+            const bound = () => Math.min(job.bound, top.length >= topN ? top[top.length - 1].cost : Infinity);
             const insert = item => {
                 let i = top.length;
                 while (i > 0 && (top[i - 1].cost > item.cost || (top[i - 1].cost === item.cost && top[i - 1].ord > item.ord))) i--;
@@ -173,11 +172,11 @@
                 }
                 if (Date.now() - lastPost > 200) {
                     lastPost = Date.now();
-                    self.postMessage({ type: 'progress', processed, total, hits });
+                    self.postMessage({ type: 'progress', gen: job.gen, processed, hits });
                     await new Promise(res => setTimeout(res, 0));
                 }
             }
-            self.postMessage({ type: 'done', processed, total, hits, items: top, cancelled });
+            self.postMessage({ type: 'done', gen: job.gen, processed, hits, items: top });
         }
 
         let captured = [];
@@ -214,7 +213,10 @@
 
         self.onmessage = e => {
             if (e.data.type === 'cancel') cancelled = true;
-            else if (e.data.type === 'run') runJob(e.data.job).catch(err => self.postMessage({ type: 'error', message: String(err && err.stack || err) }));
+            else if (e.data.type === 'run') {
+                cancelled = false;
+                runJob(e.data.job).catch(err => self.postMessage({ type: 'error', gen: e.data.job.gen, message: String(err && err.stack || err) }));
+            }
             else if (e.data.type === 'route') {
                 let route = null, error = null;
                 try { route = routeOf(e.data.job, e.data.item); } catch (err) { error = String(err && err.stack || err); }
@@ -252,46 +254,85 @@
             const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
             const w = new Worker(url);
             w.onmessage = e => onMessage(e.data);
-            return { post: m => w.postMessage(m), stop: () => w.terminate() };
+            w.onerror = e => { e.preventDefault(); onMessage({ type: 'error', message: e.message || 'Worker error' }); };
+            return { post: m => w.postMessage(m), worker: true };
         } catch (err) {
+            console.warn('Web Workers unavailable; searching on the main thread.', err);
             const fake = { postMessage: m => setTimeout(() => onMessage(m), 0), onmessage: null };
             new Function('self', src)(fake);
-            return { post: m => fake.onmessage({ data: m }), stop: () => fake.onmessage({ data: { type: 'cancel' } }) };
+            return { post: m => fake.onmessage({ data: m }), worker: false };
         }
     }
 
-    function runJob(job, onProgress) {
-        const nWorkers = Math.max(1, Math.min(8, (navigator.hardwareConcurrency || 2) - 1));
-        const span = job.endSeed - job.startSeed + 1;
-        const chunks = [];
-        for (let i = 0; i < nWorkers; i++) {
-            const a = job.startSeed + Math.floor(span * i / nWorkers), b = job.startSeed + Math.floor(span * (i + 1) / nWorkers) - 1;
-            if (a <= b) chunks.push([a, b]);
+    function workerCount() {
+        const q = parseInt(new URLSearchParams(location.search).get('workers'), 10);
+        return Math.max(1, Math.min(q >= 1 ? q : navigator.hardwareConcurrency || 4, 256));
+    }
+
+    let pool = null, runGen = 0;
+    function getPool() {
+        if (pool) return pool;
+        pool = { rts: [], idle: [], run: null };
+        const onMessage = (i, m) => {
+            if ((m.type === 'done' || m.type === 'error') && !pool.idle.includes(i)) pool.idle.push(i);
+            if (pool.run) pool.run(i, m);
+        };
+        for (let i = 0, n = workerCount(); i < n; i++) {
+            const rt = startRuntime(m => onMessage(i, m));
+            pool.rts.push(rt);
+            pool.idle.push(i);
+            if (!rt.worker) break;
         }
-        const status = chunks.map(() => ({ processed: 0, hits: 0 }));
-        const runtimes = [];
-        const promise = new Promise((resolve, reject) => {
-            const results = [];
-            let done = 0;
-            chunks.forEach(([a, b], i) => {
-                const rt = startRuntime(m => {
-                    if (m.type === 'error') { runtimes.forEach(r => r.stop()); reject(new Error(m.message)); return; }
-                    status[i] = m;
-                    onProgress(status.reduce((s, x) => ({ processed: s.processed + x.processed, hits: s.hits + x.hits }), { processed: 0, hits: 0 }),
-                               span * job.ranks.length);
-                    if (m.type !== 'done') return;
-                    results.push(...m.items);
-                    rt.stop();
-                    if (++done < chunks.length) return;
-                    results.sort((x, y) => x.cost - y.cost || x.ord - y.ord);
-                    resolve({ items: results.slice(0, job.topN), processed: status.reduce((s, x) => s + x.processed, 0),
-                              hits: status.reduce((s, x) => s + x.hits, 0) });
-                });
-                runtimes.push(rt);
-                rt.post({ type: 'run', job: Object.assign({}, job, { startSeed: a, endSeed: b }) });
-            });
-        });
-        return { promise, cancel: () => runtimes.forEach(r => r.post({ type: 'cancel' })) };
+        console.info(`Search pool: ${pool.rts.length} ${pool.rts[0].worker ? 'Web Workers' : 'main thread'} (override with ?workers=N)`);
+        return pool;
+    }
+
+    const CHUNKS_PER_WORKER = 12, CHUNK_MIN = 16, CHUNK_MAX = 1024;
+    function runJob(job, onProgress) {
+        const p = getPool(), gen = ++runGen;
+        const span = job.endSeed - job.startSeed + 1, total = span * job.ranks.length;
+        const size = Math.max(CHUNK_MIN, Math.min(CHUNK_MAX, Math.ceil(span / (p.rts.length * CHUNKS_PER_WORKER))));
+        const queue = [];
+        for (let a = job.startSeed; a <= job.endSeed; a += size) queue.push([a, Math.min(job.endSeed, a + size - 1)]);
+        const busy = new Map();
+        let top = [], processed = 0, hits = 0, stopped = false, resolve, reject;
+        const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+        const bound = () => top.length >= job.topN ? top[job.topN - 1].cost : Infinity;
+        const report = () => {
+            let hot = 0, h = 0;
+            for (const b of busy.values()) { hot += b.processed; h += b.hits; }
+            onProgress({ processed: processed + hot, hits: hits + h }, total);
+        };
+        const finish = () => { p.run = null; resolve({ items: top, processed, hits, workers: p.rts[0].worker ? p.rts.length : 0 }); };
+        const dispatch = () => {
+            while (!stopped && queue.length && p.idle.length) {
+                const i = p.idle.shift(), [a, b] = queue.shift();
+                busy.set(i, { processed: 0, hits: 0 });
+                p.rts[i].post({ type: 'run', job: Object.assign({}, job, { startSeed: a, endSeed: b, gen, bound: bound() }) });
+            }
+            if (!busy.size && (stopped || !queue.length)) finish();
+        };
+        p.run = (i, m) => {
+            if (m.gen !== undefined && m.gen !== gen) { if (m.type === 'done' || m.type === 'error') dispatch(); return; }
+            if (m.type === 'error') {
+                stopped = true;
+                busy.forEach((_, j) => p.rts[j].post({ type: 'cancel' }));
+                p.run = null;
+                reject(new Error(m.message));
+                return;
+            }
+            if (!busy.has(i)) return;
+            if (m.type === 'progress') { busy.set(i, m); report(); return; }
+            if (m.type !== 'done') return;
+            busy.delete(i);
+            processed += m.processed;
+            hits += m.hits;
+            top = top.concat(m.items).sort((x, y) => x.cost - y.cost || x.ord - y.ord).slice(0, job.topN);
+            report();
+            dispatch();
+        };
+        dispatch();
+        return { promise, cancel: () => { stopped = true; busy.forEach((_, j) => p.rts[j].post({ type: 'cancel' })); } };
     }
 
     let core = null;
@@ -540,7 +581,7 @@
                 running.btn = btn;
                 running.promise.then(res => {
                     const items = job.kind === 'item' ? shapeItems(res.items, job.preset) : res.items;
-                    setStatus(`Done: ${res.hits} Found (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
+                    setStatus(`Done: ${res.hits} Found (${((Date.now() - t0) / 1000).toFixed(1)} s, ${res.workers ? `${res.workers} ${res.workers > 1 ? 'workers' : 'worker'}` : 'main thread'})`);
                     shown = { job, items };
                     if (job.kind === 'item') renderItemResults(items); else renderFastestResults(items);
                 }).catch(err => setStatus("Error: " + err.message))
