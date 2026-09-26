@@ -232,7 +232,7 @@
         panel.className = "panel dist-panel";
         panel.innerHTML = `
             <div class="dist-row">
-                <b>Ideal Walk</b><span class="tip" tabindex="0" data-tip="Horizontal / vertical / 45° steps between 2×2px cells (1/8 tile, the character), no diagonal past a wall cell, never stepping on the up or down stairs (2px wide, 4px deep). Walks from the up stairs leave from the 2 cells in front of it, even when a chest is there; after the first step every chest (2×2px) is a wall. A walk to a chest ends on a cell touching it, a walk from a chest leaves from a cell touching it. Unit = one tile edge; 1 diagonal step = one tile edge on both x and y. From / To or a table cell picks the pair to draw; None or a – cell hides it. A search route stays until a single pair is picked.">ⓘ</span>
+                <b>Ideal Walk</b><span class="tip" tabindex="0" data-tip="Horizontal / vertical / 45° steps between 2×2px cells (1/8 tile, the character), no diagonal past a wall cell, never stepping on the up or down stairs (2px wide, 4px deep). Walks from the up stairs leave from the 2 cells in front of it, even when a chest is there; after the first step every chest (2×2px) is a wall. No diagonal past a chest either. A walk to a chest ends on a cell beside it (up, down, left or right, never diagonal); a walk from a chest leaves from such a cell. Unit = one tile edge; 1 diagonal step = one tile edge on both x and y. From / To or a table cell picks the pair to draw; None or a – cell hides it. A search route stays until a single pair is picked.">ⓘ</span>
             </div>
             <div class="dist-row">
                 <label for="distFrom">From</label><select id="distFrom"></select>

@@ -54,7 +54,7 @@
             };
         }
 
-        const LB_SLACK = 2 * (0.5 + (Math.SQRT2 - 1) * 0.5 + Math.SQRT2) / 8;
+        const LB_SLACK = 2 * (0.5 + (Math.SQRT2 - 1) * 0.5 + 1) / 8;
         const upFront = fd => {
             const s = fd.stairs.find(s => s.up);
             return s && { x: (s.shape.front[0][0] + s.shape.front[1][0] + 1) / 2 * 0x1000, y: (s.shape.front[0][1] + s.shape.front[1][1] + 1) / 2 * 0x1000 };

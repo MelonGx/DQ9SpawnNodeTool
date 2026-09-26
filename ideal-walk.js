@@ -291,7 +291,7 @@ function createIdealWalk(px = 16, tkg) {
 
     const cellIndex = ([x, y]) => (x >= 0 && y >= 0 && x < freeW && y < freeH) ? y * freeW + x : -1;
 
-    const AROUND = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+    const AROUND = [[1, 0], [0, 1], [-1, 0], [0, -1]];
     const isStairs = (stairs, j) => (stairs || []).some(s => s.k === j);
 
     function legSetup(points, stairs, src, dst) {
