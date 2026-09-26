@@ -42,22 +42,21 @@
             }));
         }
 
-        function costRow(fd, i, exact) {
-            const row = fd.points.map(() => Infinity);
+        let walkFloor = null;
+        function costRow(fd, i, exact, j, row) {
             if (fd.points[i]) {
-                const cols = fd.points.flatMap((p, j) => p ? [j] : []);
                 if (exact) {
-                    walk.setFloor(fd.info);
-                    const d = walk.gridFrom(fd.points, i, fd.stairs);
-                    for (const j of cols) row[j] = d[j];
+                    if (walkFloor !== fd) { walk.setFloor(fd.info); walkFloor = fd; }
+                    walk.gridFrom(fd.points, i, fd.stairs, j).forEach((d, k) => { if (d !== undefined) row[k] = d; });
                 } else {
+                    const cols = fd.points.flatMap((p, k) => p ? [k] : []);
                     tileWalk.setFloorTiles(fd.info);
-                    const valid = fd.points.map((p, j) => (j === i && j === 0 && fd.upFront) || p || { x: 0, y: 0 });
+                    const valid = fd.points.map((p, k) => (k === i && k === 0 && fd.upFront) || p || { x: 0, y: 0 });
                     const d = tileWalk.shortest(valid, i, cols);
-                    for (const j of cols) row[j] = j === i ? 0 : Math.max(0, d[j] - walk.LB_SLACK);
+                    for (const k of cols) row[k] = k === i ? 0 : Math.max(0, d[k] - walk.LB_SLACK);
                 }
             }
-            return row;
+            if (row[j] === undefined) row[j] = Infinity;
         }
 
         let cacheSeed = -1, floorCache = [];
@@ -67,8 +66,9 @@
         }
         function cost(seed, f, i, j, exact) {
             const e = floorEntry(seed, f), key = (exact ? 'x' : 'l') + i;
-            if (!e.rows[key]) e.rows[key] = costRow(e.fd, i, exact);
-            return e.rows[key][j];
+            const row = e.rows[key] || (e.rows[key] = []);
+            if (row[j] === undefined) costRow(e.fd, i, exact, j, row);
+            return row[j];
         }
         const tilesOf = (seed, f) => floorEntry(seed, f).fd.tiles;
         const floorOf = (seed, index1) => floorEntry(seed, index1 - 1).fd;
