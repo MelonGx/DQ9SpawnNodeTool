@@ -50,7 +50,7 @@
                 context: ctx,
                 stairs: [[0, true, st.up, ctx.upStairs], [1, false, st.down, ctx.downStairs]]
                     .filter(([, , c, tile]) => c && tile).map(([k, up, c, tile]) => ({ k, up, shape: up ? walk.stairsShape(c, tile, tkg.grid) : null })),
-                info: { grid: tkg.grid, width: tkg.width, height: tkg.height, bitfield: tkg.bitfield },
+                info: { grid: tkg.grid, width: tkg.width, height: tkg.height, bitfield: tkg.bitfield, env: tkg.envIndices[envName] },
             };
         }
 

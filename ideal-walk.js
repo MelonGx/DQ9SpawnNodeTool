@@ -116,21 +116,28 @@ function createIdealWalk(px = 16, tkg) {
         return true;
     }
 
+    const OUTER_LEG = [6, 8, 6, 6, 6];
+    const INNER_CUT = [18, 8, 18, 18, 14];
+    function isWallPx(m, env, x, y) {
+        const P = PX, B = PX / 4, k = P / 16, cx = x + 0.5, cy = y + 0.5;
+        if ((m & 0x01 && cx < B) || (m & 0x10 && cx > P - B) || (m & 0x40 && cy < B) || (m & 0x04 && cy > P - B)) return true;
+        const leg = OUTER_LEG[env] * k, cut = INNER_CUT[env] * k;
+        if ((m & 0x08 && !(m & 0x14) && (P - cx) + (P - cy) < leg) || (m & 0x20 && !(m & 0x50) && (P - cx) + cy < leg)
+            || (m & 0x02 && !(m & 0x05) && cx + (P - cy) < leg) || (m & 0x80 && !(m & 0x41) && cx + cy < leg)) return true;
+        return (m === 0x3E && cx + cy > cut) || (m === 0xE3 && (P - cx) + (P - cy) > cut)
+            || (m === 0x8F && (P - cx) + cy > cut) || (m === 0xF8 && cx + (P - cy) > cut);
+    }
+
     function setFloor(map) {
-        const { grid, width: mapWidth, height: mapHeight, bitfield: bitfieldGrid } = map;
-        const W = mapWidth * PX, B = PX / 4, E = PX - B;
+        const { grid, width: mapWidth, height: mapHeight, bitfield: bitfieldGrid, env } = map;
+        const W = mapWidth * PX;
         const floor = new Uint8Array(W * mapHeight * PX);
         for (let ty = 0; ty < mapHeight; ty++) {
             for (let tx = 0; tx < mapWidth; tx++) {
                 if (!isWalkableTile(grid, tx, ty)) continue;
                 const m = bitfieldGrid[ty][tx];
                 for (let y = 0; y < PX; y++) {
-                    for (let x = 0; x < PX; x++) {
-                        const wall = (m & 0x01 && x < B) || (m & 0x10 && x >= E) || (m & 0x40 && y < B) || (m & 0x04 && y >= E)
-                            || (m & 0x80 && x < B && y < B) || (m & 0x20 && x >= E && y < B)
-                            || (m & 0x08 && x >= E && y >= E) || (m & 0x02 && x < B && y >= E);
-                        if (!wall) floor[(ty * PX + y) * W + tx * PX + x] = 1;
-                    }
+                    for (let x = 0; x < PX; x++) if (!isWallPx(m, env, x, y)) floor[(ty * PX + y) * W + tx * PX + x] = 1;
                 }
             }
         }
