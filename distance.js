@@ -7,7 +7,8 @@
     const S = walk.SIZES, px = v => `${+v.toFixed(2)}px`, part = v => `1/${S.corridor / v} of a corridor`;
     const WALK_TIP = `Walls are the dark wall lines TKG draws; a corridor is ${px(S.corridor)} wide. ` +
         `The character (${px(S.char)} × ${px(S.char)}, ${part(S.char)}) moves ${px(S.step)} at a time, horizontally, vertically or at 45°; ` +
-        `its centre stays on the floor, its body may reach only the first px of a wall line, and it never goes diagonally past a wall. ` +
+        `its centre stays on the floor; walking straight, its body may reach only the first px of a wall line; ` +
+        `walking at 45°, its body stays off the wall lines, so it never cuts a wall. ` +
         `The up stairs (${px(S.upWidth)} wide, ${px(S.upDepth)} deep, right behind its point) and the down stairs ` +
         `(a ${px(S.down)} square, ${part(S.down)}, centred on its point) are walls. ` +
         `Walks from the up stairs start with the character right in front of it, even on a chest; once it moves, ` +

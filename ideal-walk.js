@@ -12,7 +12,7 @@ function createIdealWalk(px = 16, tkg) {
     const FOOT = px > 1 ? CHAR * SUB : 1;
     const DIAG_EXTRA = Math.SQRT2 - 1;
 
-    let free = null;
+    let free = null, clear = null;
     let freeW = 0, freeH = 0;
 
     function isFree(cx, cy) {
@@ -219,14 +219,19 @@ function createIdealWalk(px = 16, tkg) {
         for (const i of edge) floor[i] = 1;
         const GW = mapWidth * GRID, GH = mapHeight * GRID;
         free = new Uint8Array(GW * GH);
+        clear = new Uint8Array(GW * GH);
         for (let gy = 0; gy + FOOT <= GH; gy++) {
             for (let gx = 0; gx + FOOT <= GW; gx++) {
                 const c = Math.floor((gy + FOOT / 2) / SUB) * W + Math.floor((gx + FOOT / 2) / SUB);
-                let all = core[c];
+                let all = core[c], inner = 1;
                 for (let y = Math.floor(gy / SUB); y <= Math.floor((gy + FOOT - 1) / SUB) && all; y++) {
-                    for (let x = Math.floor(gx / SUB); x <= Math.floor((gx + FOOT - 1) / SUB); x++) if (!floor[y * W + x]) { all = 0; break; }
+                    for (let x = Math.floor(gx / SUB); x <= Math.floor((gx + FOOT - 1) / SUB); x++) {
+                        if (!floor[y * W + x]) { all = 0; break; }
+                        if (!core[y * W + x]) inner = 0;
+                    }
                 }
                 free[gy * GW + gx] = all;
+                clear[gy * GW + gx] = all & inner;
             }
         }
         freeW = GW; freeH = GH;
@@ -341,7 +346,7 @@ function createIdealWalk(px = 16, tkg) {
         const step = (u, ox, oy) => {
             const cx = u % freeW, cy = (u / freeW) | 0, v = posIndex(cx + ox, cy + oy);
             if (!pass(u, v)) return -1;
-            if (ox && oy && (!pass(u, posIndex(cx + ox, cy)) || !pass(u, posIndex(cx, cy + oy)))) return -1;
+            if (ox && oy && [v, posIndex(cx + ox, cy), posIndex(cx, cy + oy)].some(w => !clear[w] || !pass(u, w))) return -1;
             return v;
         };
         const standing = i => i >= 0 && free[i] === 1 && !hard[i] && !chest[i];
