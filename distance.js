@@ -1,5 +1,5 @@
 (function () {
-    const walk = createIdealWalk(16, { TILE_WALL, TILE_DIVIDER, tileMap });
+    const walk = createIdealWalk(16, { TILE_WALL, TILE_DIVIDER, tileMap, modifiers, exceptions });
     const TILE = walk.TILE;
     const PX_PER_TILE = 64;
     const SVG_NS = "http://www.w3.org/2000/svg";
@@ -48,40 +48,30 @@
         return Infinity;
     }
 
-    function collectPoints() {
-        const pts = [];
-        const sc = mapContext.stairsCoords || {};
-        const offsets = [...new Set(modifiers.concat(Object.values(exceptions)).map(m => m.x))];
-        const add = (key, label, name, color, c, tile) => {
-            if (!c || !tile) return;
-            const x = walk.exactCoord(c.x, tile.x, offsets), y = walk.exactCoord(c.z, tile.y, offsets);
-            if (x !== null && y !== null) pts.push({ key, label, name, color, x, y, tx: tile.x, ty: tile.y });
-        };
-        add('up', 'U', 'Up Stairs', '#00ff00', sc.up, mapContext.upStairs);
-        add('down', 'D', 'Down Stairs', '#ff4040', sc.down, mapContext.downStairs);
-        const chestTiles = (mapContext.field_0 && mapContext.field_0._chestCoords) || [];
-        (mapContext.chestCoords || []).forEach((c, i) =>
-            add('c' + i, String(i + 1), 'Chest ' + (i + 1), '#ffff00', c, chestTiles[i]));
-        return pts;
-    }
+    const META = [['up', 'U', 'Up Stairs', '#00ff00'], ['down', 'D', 'Down Stairs', '#ff4040']];
+    const metaOf = k => k < 2 ? META[k] : ['c' + (k - 2), String(k - 1), 'Chest ' + (k - 1), '#ffff00'];
 
     function recompute() {
         if (!mapContext) { state = null; return; }
-        walk.setFloor({ grid: mapGrid, width: mapWidth, height: mapHeight, bitfield: bitfieldGrid,
-                        env: envIndices[getEnvironment(mapContext.field_0.mapseed)] });
-        const points = collectPoints();
-        const stairs = ['up', 'down'].flatMap(key => {
-            const k = points.findIndex(p => p.key === key);
-            const tile = key === 'up' ? mapContext.upStairs : mapContext.downStairs;
-            return k < 0 ? [] : [{ k, up: key === 'up', shape: key === 'up' ? walk.stairsShape(mapContext.stairsCoords[key], tile, mapGrid) : null }];
+        const f = mapContext.field_0, sc = mapContext.stairsCoords || {};
+        const model = walk.floorModel({
+            grid: mapGrid, width: mapWidth, height: mapHeight, bitfield: bitfieldGrid, env: envIndices[getEnvironment(f.mapseed)],
+            up: sc.up, down: sc.down, upTile: mapContext.upStairs, downTile: mapContext.downStairs,
+            chests: mapContext.chestCoords || [], chestTiles: f._chestCoords || [],
+        });
+        walk.setFloor(model.info);
+        const points = model.points.flatMap((p, k) => {
+            if (!p) return [];
+            const [key, label, name, color] = metaOf(k);
+            return [{ x: p.x, y: p.y, k, key, label, name, color, tx: model.tiles[k].x, ty: model.tiles[k].y }];
         });
 
         const dist = {}, dq9at = {};
-        points.forEach((a, i) => {
-            const d = walk.gridFrom(points, i, stairs);
-            points.forEach((b, j) => {
+        points.forEach(a => {
+            const d = walk.gridFrom(model.points, a.k, model.stairs);
+            points.forEach(b => {
                 const id = a.key + '>' + b.key;
-                dist[id] = d[j];
+                dist[id] = d[b.k];
                 dq9at[id] = dq9atStepCost(a.tx, a.ty, b.tx, b.ty);
             });
         });
@@ -89,8 +79,8 @@
         const paths = {};
         const path = id => {
             if (!(id in paths)) {
-                const [f, t] = id.split('>'), i = points.findIndex(p => p.key === f), j = points.findIndex(p => p.key === t);
-                paths[id] = (i < 0 || j < 0 || i === j) ? [] : walk.gridPath(points, i, j, stairs);
+                const [a, b] = id.split('>').map(key => points.find(p => p.key === key));
+                paths[id] = (!a || !b || a === b) ? [] : walk.gridPath(model.points, a.k, b.k, model.stairs);
             }
             return paths[id];
         };

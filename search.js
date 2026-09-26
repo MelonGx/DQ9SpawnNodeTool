@@ -29,36 +29,20 @@
         const tkg = TKG_GEN();
         const walk = createIdealWalk(16, tkg);
         const tileWalk = createIdealWalk(1, tkg);
-        const offsets = [...new Set(tkg.modifiers.concat(Object.values(tkg.exceptions)).map(m => m.x))];
         let cancelled = false;
 
         function genFloor(seed, floor1) {
             tkg.generate(seed, floor1);
-            const ctx = tkg.context, hex = ctx.field_0.mapseed;
-            const envName = tkg.getEnvironment(hex);
+            const ctx = tkg.context, hex = ctx.field_0.mapseed, envName = tkg.getEnvironment(hex);
             const st = tkg.calculateStairsCoords(hex, envName);
-            const chestTiles = (ctx.field_0 && ctx.field_0._chestCoords) || [];
-            const pt = (c, tile) => {
-                if (!c || !tile) return null;
-                const x = walk.exactCoord(c.x, tile.x, offsets), y = walk.exactCoord(c.z, tile.y, offsets);
-                return x === null || y === null ? null : { x, y };
-            };
-            return {
-                points: [pt(st.up, ctx.upStairs), pt(st.down, ctx.downStairs)]
-                    .concat(tkg.calculateChestCoords(hex, floor1, envName).map((c, i) => pt(c, chestTiles[i]))),
-                tiles: [ctx.upStairs, ctx.downStairs].concat(chestTiles),
-                context: ctx,
-                stairs: [[0, true, st.up, ctx.upStairs], [1, false, st.down, ctx.downStairs]]
-                    .filter(([, , c, tile]) => c && tile).map(([k, up, c, tile]) => ({ k, up, shape: up ? walk.stairsShape(c, tile, tkg.grid) : null })),
-                info: { grid: tkg.grid, width: tkg.width, height: tkg.height, bitfield: tkg.bitfield, env: tkg.envIndices[envName] },
-            };
+            return Object.assign({ context: ctx }, walk.floorModel({
+                grid: tkg.grid, width: tkg.width, height: tkg.height, bitfield: tkg.bitfield, env: tkg.envIndices[envName],
+                up: st.up, down: st.down, upTile: ctx.upStairs, downTile: ctx.downStairs,
+                chests: tkg.calculateChestCoords(hex, floor1, envName), chestTiles: ctx.field_0._chestCoords || [],
+            }));
         }
 
         const LB_SLACK = 2 * 4 / 16;
-        const upFront = fd => {
-            const s = fd.stairs.find(s => s.up);
-            return s && { x: (s.shape.front.x0 + s.shape.front.x1) / 2 * 0x800, y: (s.shape.front.y0 + s.shape.front.y1) / 2 * 0x800 };
-        };
         function costRow(fd, i, exact) {
             const row = fd.points.map(() => Infinity);
             if (fd.points[i]) {
@@ -69,7 +53,7 @@
                     for (const j of cols) row[j] = d[j];
                 } else {
                     tileWalk.setFloorTiles(fd.info);
-                    const valid = fd.points.map((p, j) => (j === i && j === 0 && upFront(fd)) || p || { x: 0, y: 0 });
+                    const valid = fd.points.map((p, j) => (j === i && j === 0 && fd.upFront) || p || { x: 0, y: 0 });
                     const d = tileWalk.shortest(valid, i, cols);
                     for (const j of cols) row[j] = j === i ? 0 : Math.max(0, d[j] - LB_SLACK);
                 }
