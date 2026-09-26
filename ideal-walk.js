@@ -319,6 +319,7 @@ function createIdealWalk(px = 16, tkg) {
         }
         return out;
     }
+    const centreIn = (i, b) => { const x = (i % freeW + FOOT / 2) / SUB, y = (((i / freeW) | 0) + FOOT / 2) / SUB; return x >= b.x0 && x <= b.x1 && y >= b.y0 && y <= b.y1; };
     const around = (p, h) => { const x = toPx(p.x), y = toPx(p.y); return { x0: x - h, x1: x + h, y0: y - h, y1: y + h }; };
     const isStairs = (stairs, j) => (stairs || []).some(s => s.k === j);
 
@@ -334,7 +335,7 @@ function createIdealWalk(px = 16, tkg) {
             if (s.k === dst || (s.k === src && !s.up)) continue;
             const body = s.up ? s.shape.body : around(points[s.k], DOWN_HALF);
             for (const i of positionsOver(body)) hard[i] = 1;
-            if (s.k === src) starts = positionsOver(s.shape.front).filter(i => free[i] === 1 && !overlap(i, body));
+            if (s.k === src) starts = positionsOver(s.shape.front).filter(i => free[i] === 1 && !overlap(i, body) && centreIn(i, s.shape.front));
         }
         const pass = (u, v) => v >= 0 && free[v] === 1 && !hard[v] && (!chest[v] || chest[v] < chest[u]);
         const step = (u, ox, oy) => {
