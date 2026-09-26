@@ -250,7 +250,7 @@
     get grid() { return mapGrid; }, get width() { return mapWidth; }, get height() { return mapHeight; },
     get bitfield() { return bitfieldGrid; }, get context() { return mapContext; },
     getEnvironment, envIndices, calculateStairsCoords, calculateChestCoords, modifiers, exceptions, LCG,
-    TILE_WALL, TILE_DIVIDER,
+    tileMap, TILE_WALL, TILE_DIVIDER,
 };\n}\n`;
     }
 
