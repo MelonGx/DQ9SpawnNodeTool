@@ -1,8 +1,9 @@
 function createIdealWalk(px = 16, tkg) {
     const TILE = 8 * 0x1000;
     const PX = px;
-    const GRID = px > 1 ? px / 2 : px;
+    const GRID = px;
     const CELL = TILE / GRID;
+    const FOOT = px > 1 ? 2 : 1;
     const DIAG_EXTRA = Math.SQRT2 - 1;
 
     let free = null;
@@ -202,12 +203,12 @@ function createIdealWalk(px = 16, tkg) {
             const i = stack.pop(), x = i % W, y = (i / W) | 0;
             pushFloor(x + 1, y); pushFloor(x - 1, y); pushFloor(x, y + 1); pushFloor(x, y - 1);
         }
-        const GW = mapWidth * GRID, GH = mapHeight * GRID, k = PX / GRID;
+        const GW = mapWidth * GRID, GH = mapHeight * GRID;
         free = new Uint8Array(GW * GH);
-        for (let gy = 0; gy < GH; gy++) {
-            for (let gx = 0; gx < GW; gx++) {
+        for (let gy = 0; gy + FOOT <= GH; gy++) {
+            for (let gx = 0; gx + FOOT <= GW; gx++) {
                 let all = 1;
-                for (let y = gy * k; y < (gy + 1) * k && all; y++) for (let x = gx * k; x < (gx + 1) * k; x++) if (!floor[y * W + x]) { all = 0; break; }
+                for (let y = gy; y < gy + FOOT && all; y++) for (let x = gx; x < gx + FOOT; x++) if (!floor[y * W + x]) { all = 0; break; }
                 free[gy * GW + gx] = all;
             }
         }
@@ -275,46 +276,72 @@ function createIdealWalk(px = 16, tkg) {
         return g;
     }
 
-    const cellOf = p => Math.floor(p.y / CELL) * freeW + Math.floor(p.x / CELL);
+    const pxOf = v => Math.floor(v / CELL);
 
     function stairsShape(fine, tile, grid) {
         const solid = (x, y) => { const t = grid[y] && grid[y][x]; return t === undefined || t === tkg.TILE_WALL || t === tkg.TILE_DIVIDER; };
         const [dx, dy] = !solid(tile.x, tile.y + 1) ? [0, 1] : !solid(tile.x + 1, tile.y) ? [1, 0]
             : !solid(tile.x - 1, tile.y) ? [-1, 0] : !solid(tile.x, tile.y - 1) ? [0, -1] : [0, 1];
-        const d = dx || dy, front = d > 0 ? 0 : -1, along = [front, front - d, front - 2 * d];
-        const cell = (a, c) => dx ? [fine.x + a, fine.z + c] : [fine.x + c, fine.z + a];
+        const d = dx || dy, front = d > 0 ? 0 : -1;
+        const ux = fine.x * 2, uz = fine.z * 2;
+        const at = (a, c) => dx ? [ux + a, uz + c] : [ux + c, uz + a];
+        const across = [-1, 0];
         return {
-            front: [cell(along[0], -1), cell(along[0], 0)],
-            body: [cell(along[1], -1), cell(along[1], 0), cell(along[2], -1), cell(along[2], 0)],
+            front: across.map(c => at(front, c)),
+            body: [1, 2, 3, 4].flatMap(k => across.map(c => at(front - k * d, c))),
         };
     }
 
-    const cellIndex = ([x, y]) => (x >= 0 && y >= 0 && x < freeW && y < freeH) ? y * freeW + x : -1;
+    const posIndex = (x, y) => (x >= 0 && y >= 0 && x < freeW && y < freeH) ? y * freeW + x : -1;
+    const covers = (i, [x, y]) => { const px = i % freeW, py = (i / freeW) | 0; return x >= px && x < px + FOOT && y >= py && y < py + FOOT; };
+    const footprintsOver = pixels => {
+        const out = new Set();
+        for (const [x, y] of pixels) for (let oy = 1 - FOOT; oy <= 0; oy++) for (let ox = 1 - FOOT; ox <= 0; ox++) {
+            const i = posIndex(x + ox, y + oy);
+            if (i >= 0) out.add(i);
+        }
+        return [...out];
+    };
 
-    const AROUND = [[1, 0], [0, 1], [-1, 0], [0, -1]];
     const isStairs = (stairs, j) => (stairs || []).some(s => s.k === j);
+    const chestPixels = p => { const x = Math.floor(p.x / 0x1000) * 2, y = Math.floor(p.y / 0x1000) * 2; return [[x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]]; };
 
     function legSetup(points, stairs, src, dst) {
-        const blocked = new Uint8Array(freeW * freeH);
+        const N = freeW * freeH, hard = new Uint8Array(N), chest = new Uint8Array(N);
+        points.forEach((p, j) => {
+            if (!p || isStairs(stairs, j)) return;
+            for (const px of chestPixels(p)) for (const i of footprintsOver([px])) chest[i]++;
+        });
         let starts = null;
-        points.forEach((p, j) => { if (p && !isStairs(stairs, j)) { const c = cellOf(p); if (c >= 0 && c < blocked.length) blocked[c] = 1; } });
         for (const s of stairs || []) {
             if (s.k === dst || (s.k === src && !s.up)) continue;
-            for (const c of s.shape.body) { const i = cellIndex(c); if (i >= 0) blocked[i] = 1; }
-            if (s.k === src) starts = s.shape.front.map(cellIndex).filter(i => i >= 0 && free[i] === 1);
+            for (const i of footprintsOver(s.shape.body)) hard[i] = 1;
+            if (s.k === src) starts = footprintsOver(s.shape.front).filter(i => free[i] === 1 && !s.shape.body.some(b => covers(i, b)));
         }
-        const open = i => free[i] === 1 && !blocked[i];
+        const pass = (u, v) => v >= 0 && free[v] === 1 && !hard[v] && (!chest[v] || chest[v] < chest[u]);
+        const step = (u, ox, oy) => {
+            const cx = u % freeW, cy = (u / freeW) | 0, v = posIndex(cx + ox, cy + oy);
+            if (!pass(u, v)) return -1;
+            if (ox && oy && (!pass(u, posIndex(cx + ox, cy)) || !pass(u, posIndex(cx, cy + oy)))) return -1;
+            return v;
+        };
+        const standing = i => i >= 0 && free[i] === 1 && !hard[i] && !chest[i];
         const goals = j => {
-            const c = cellOf(points[j]);
-            if (isStairs(stairs, j)) return free[c] === 1 ? [c] : [];
-            const cx = c % freeW, cy = (c / freeW) | 0;
-            return AROUND.map(([ox, oy]) => cellIndex([cx + ox, cy + oy])).filter(i => i >= 0 && open(i));
+            const p = points[j];
+            if (isStairs(stairs, j)) return footprintsOver([[pxOf(p.x), pxOf(p.y)]]).filter(standing);
+            const [[x, y]] = chestPixels(p), out = [];
+            for (let k = 1 - FOOT; k <= 1; k++) {
+                out.push(posIndex(x - FOOT, y + k), posIndex(x + 2, y + k), posIndex(x + k, y - FOOT), posIndex(x + k, y + 2));
+            }
+            return [...new Set(out)].filter(standing);
         };
         if (!starts) starts = goals(src);
-        return { blocked, starts, goals };
+        return { step, starts, goals };
     }
 
-    function gridShortest(targets, blocked, starts, goals) {
+    const MOVES = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+
+    function gridShortest(targets, step, starts, goals) {
         const W = freeW, H = freeH;
         const g = new Float64Array(W * H).fill(Infinity), closed = new Uint8Array(W * H);
         const res = targets.map(() => Infinity), goalOf = new Map();
@@ -327,7 +354,6 @@ function createIdealWalk(px = 16, tkg) {
             return best === Infinity ? 0 : best;
         };
         const heap = makeHeap(byKey);
-        const open = (x, y) => isFree(x, y) && !blocked[y * W + x];
         for (const start of starts) { g[start] = 0; heap.push([h(start), start]); }
         while (heap.size && left.size) {
             const u = heap.pop()[1];
@@ -339,16 +365,11 @@ function createIdealWalk(px = 16, tkg) {
                 for (const [, v] of heap.drain()) if (!closed[v]) heap.push([g[v] + h(v), v]);
                 if (!left.size) break;
             }
-            const cx = u % W, cy = (u / W) | 0;
-            for (let oy = -1; oy <= 1; oy++) {
-                for (let ox = -1; ox <= 1; ox++) {
-                    if (!ox && !oy) continue;
-                    const nx = cx + ox, ny = cy + oy;
-                    if (!open(nx, ny)) continue;
-                    if (ox && oy && (!open(cx + ox, cy) || !open(cx, cy + oy))) continue;
-                    const v = ny * W + nx, gv = g[u] + (ox && oy ? Math.SQRT2 : 1);
-                    if (gv < g[v]) { g[v] = gv; heap.push([gv + h(v), v]); }
-                }
+            for (const [ox, oy] of MOVES) {
+                const v = step(u, ox, oy);
+                if (v < 0) continue;
+                const gv = g[u] + (ox && oy ? Math.SQRT2 : 1);
+                if (gv < g[v]) { g[v] = gv; heap.push([gv + h(v), v]); }
             }
         }
         return res;
@@ -364,19 +385,18 @@ function createIdealWalk(px = 16, tkg) {
             groups.get(key).push(j);
         });
         for (const targets of groups.values()) {
-            const { blocked, starts, goals } = legSetup(points, stairs, src, targets[0]);
-            const d = gridShortest(targets, blocked, starts, goals);
+            const { step, starts, goals } = legSetup(points, stairs, src, targets[0]);
+            const d = gridShortest(targets, step, starts, goals);
             targets.forEach((j, k) => { dist[j] = d[k]; });
         }
         return dist;
     }
 
-    const DIRS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
     function gridPath(points, src, dst, stairs) {
         const W = freeW, N = W * freeH;
-        const { blocked, starts: firsts, goals } = legSetup(points, stairs, src, dst);
-        const open = (x, y) => isFree(x, y) && !blocked[y * W + x];
-        const nearWall = (x, y) => {
+        const { step, starts: firsts, goals } = legSetup(points, stairs, src, dst);
+        const nearWall = c => {
+            const x = c % W, y = (c / W) | 0;
             for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) if ((ox || oy) && !isFree(x + ox, y + oy)) return 1;
             return 0;
         };
@@ -403,23 +423,21 @@ function createIdealWalk(px = 16, tkg) {
             done[u] = 1;
             const c = (u / 9) | 0, hd = u % 9;
             if (ends.has(c)) { end = u; break; }
-            const cx = c % W, cy = (c / W) | 0;
             for (let d = 0; d < 8; d++) {
-                const [ox, oy] = DIRS[d], nx = cx + ox, ny = cy + oy;
-                if (!open(nx, ny)) continue;
-                if (ox && oy && (!open(cx + ox, cy) || !open(cx, cy + oy))) continue;
+                const [ox, oy] = MOVES[d], n = step(c, ox, oy);
+                if (n < 0) continue;
                 const a1 = a + (ox && oy ? 0 : 1), b1 = b + (ox && oy ? 1 : 0);
-                const t1 = t + (hd !== 8 && hd !== d ? 1 : 0), w1 = w + nearWall(nx, ny);
-                const v = (ny * W + nx) * 9 + d;
+                const t1 = t + (hd !== 8 && hd !== d ? 1 : 0), w1 = w + nearWall(n);
+                const v = n * 9 + d;
                 if (done[v] || !less(a1, b1, t1, w1, v)) continue;
                 sa[v] = a1; sb[v] = b1; st[v] = t1; sw[v] = w1; prev[v] = u;
-                heap.push([a1 + b1 * Math.SQRT2 + h(ny * W + nx), t1, w1, a1, b1, v]);
+                heap.push([a1 + b1 * Math.SQRT2 + h(n), t1, w1, a1, b1, v]);
             }
         }
         if (end < 0) return [];
         const cells = [];
         for (let u = end; u >= 0; u = prev[u]) cells.unshift((u / 9) | 0);
-        const pts = cells.map(c => ({ x: (c % W + 0.5) * CELL, y: (((c / W) | 0) + 0.5) * CELL }));
+        const pts = cells.map(c => ({ x: (c % W + FOOT / 2) * CELL, y: (((c / W) | 0) + FOOT / 2) * CELL }));
         return pts.filter((p, i) => {
             if (i === 0 || i === pts.length - 1) return true;
             const a = pts[i - 1], b = pts[i + 1];

@@ -99,10 +99,10 @@
     }
 
     function split(len) {
-        const steps = len * 8;
+        const steps = len * 16;
         for (let b = 0; b * Math.SQRT2 <= steps + 1e-9; b++) {
             const a = steps - b * Math.SQRT2;
-            if (Math.abs(a - Math.round(a)) < 1e-6) return [Math.round(a) / 8, b / 8];
+            if (Math.abs(a - Math.round(a)) < 1e-6) return [Math.round(a) / 16, b / 16];
         }
         return [NaN, NaN];
     }
@@ -232,7 +232,7 @@
         panel.className = "panel dist-panel";
         panel.innerHTML = `
             <div class="dist-row">
-                <b>Ideal Walk</b><span class="tip" tabindex="0" data-tip="Horizontal / vertical / 45° steps between 2×2px cells (1/8 tile, the character), no diagonal past a wall cell, never stepping on the up or down stairs (2px wide, 4px deep). Walks from the up stairs leave from the 2 cells in front of it, even when a chest is there; after the first step every chest (2×2px) is a wall. No diagonal past a chest either. A walk to a chest ends on a cell beside it (up, down, left or right, never diagonal); a walk from a chest leaves from such a cell. Unit = one tile edge; 1 diagonal step = one tile edge on both x and y. From / To or a table cell picks the pair to draw; None or a – cell hides it. A search route stays until a single pair is picked.">ⓘ</span>
+                <b>Ideal Walk</b><span class="tip" tabindex="0" data-tip="The character (2×2px) moves 1px (1/16 tile) at a time, horizontally, vertically or at 45°, never with any part on a wall px, and never diagonally past a wall. The up and down stairs (2px wide, 4px deep) are walls. Walks from the up stairs start with the character right in front of it, even on a chest; once it moves, every chest (2×2px) is a wall, which it can only leave, never enter. A walk to a chest ends touching one of its sides (never only a corner); a walk from a chest leaves from such a spot. Unit = one tile edge; 1 diagonal step = one tile edge on both x and y. From / To or a table cell picks the pair to draw; None or a – cell hides it. A search route stays until a single pair is picked.">ⓘ</span>
             </div>
             <div class="dist-row">
                 <label for="distFrom">From</label><select id="distFrom"></select>
