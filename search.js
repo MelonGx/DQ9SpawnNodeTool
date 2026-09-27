@@ -346,12 +346,13 @@
     }
 
     const byCost = (x, y) => x.cost - y.cost || x.ord - y.ord;
+    const TIE = 1e-9;
     function runFastestMap(job, onProgress) {
         let stopped = false, stage = runJob(Object.assign({}, job, { lowerBounds: true, topN: Infinity }), onProgress);
         const promise = stage.promise.then(first => new Promise((resolve, reject) => {
             const p = getPool(), gen = ++runGen, cands = first.items, busy = new Map(), walked = new Map();
             let next = 0, top = [];
-            const bound = () => top.length >= job.topN ? top[job.topN - 1].cost : Infinity;
+            const bound = () => (top.length >= job.topN ? top[job.topN - 1].cost : Infinity) + TIE;
             const known = c => walked.get(c.seed) || [];
             const add = (c, per, cost) => { top = top.concat([Object.assign({}, c, { cost, per: per.slice(0, c.lbs.length), lbs: undefined })]).sort(byCost).slice(0, job.topN); };
             const done = () => stopped || next >= cands.length || cands[next].cost > bound();
