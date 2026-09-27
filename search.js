@@ -36,7 +36,7 @@
             const ctx = tkg.context, hex = ctx.field_0.mapseed, envName = tkg.getEnvironment(hex);
             const st = tkg.calculateStairsCoords(hex, envName);
             return Object.assign({ context: ctx }, walk.floorModel({
-                grid: tkg.grid, width: tkg.width, height: tkg.height, bitfield: tkg.bitfield, env: tkg.envIndices[envName],
+                grid: tkg.grid, width: tkg.width, height: tkg.height, bitfield: tkg.bitfield,
                 up: st.up, down: st.down, upTile: ctx.upStairs, downTile: ctx.downStairs,
                 chests: tkg.calculateChestCoords(hex, floor1, envName), chestTiles: ctx.field_0._chestCoords || [],
             }));
@@ -244,7 +244,7 @@
     get grid() { return mapGrid; }, get width() { return mapWidth; }, get height() { return mapHeight; },
     get bitfield() { return bitfieldGrid; }, get context() { return mapContext; },
     getEnvironment, envIndices, calculateStairsCoords, calculateChestCoords, LCG,
-    tileMap, TILE_WALL, TILE_DIVIDER,
+    TILE_WALL, TILE_DIVIDER,
 };\n}\n`;
     }
 

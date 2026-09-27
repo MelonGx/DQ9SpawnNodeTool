@@ -1,11 +1,12 @@
 (function () {
-    const walk = createIdealWalk(16, { TILE_WALL, TILE_DIVIDER, tileMap });
+    const walk = createIdealWalk(16, { TILE_WALL, TILE_DIVIDER });
     const TILE = walk.TILE;
     const PX_PER_TILE = 64;
     const SVG_NS = "http://www.w3.org/2000/svg";
     const PATH_COLOR = "#ff00ff";
     const S = walk.SIZES, px = v => `${+v.toFixed(2)}px`, part = v => `1/${S.corridor / v} of a corridor`;
-    const WALK_TIP = `Walls are the dark wall lines TKG draws; a corridor is ${px(S.corridor)} wide. ` +
+    const WALK_TIP = `Walls and floor follow TKG's tile grid and wall masks: every open tile has a ${px(S.corridor)} floor band through its centre, ` +
+        `running out to each open side, and a room corner is floor only when TKG's mask leaves it open. ` +
         `The character (${px(S.char)} × ${px(S.char)}, ${part(S.char)}) moves ${px(S.step)} at a time, horizontally, vertically or at 45°; ` +
         `its whole body stays on the floor and never touches a wall line, walking straight or at 45°, so it never cuts a wall. ` +
         `The up stairs (${px(S.upWidth)} wide, ${px(S.upDepth)} deep, right behind its point) and the down stairs ` +
@@ -67,7 +68,7 @@
         if (!mapContext) { state = null; return; }
         const f = mapContext.field_0, sc = mapContext.stairsCoords || {};
         const model = walk.floorModel({
-            grid: mapGrid, width: mapWidth, height: mapHeight, bitfield: bitfieldGrid, env: envIndices[getEnvironment(f.mapseed)],
+            grid: mapGrid, width: mapWidth, height: mapHeight, bitfield: bitfieldGrid,
             up: sc.up, down: sc.down, upTile: mapContext.upStairs, downTile: mapContext.downStairs,
             chests: mapContext.chestCoords || [], chestTiles: f._chestCoords || [],
         });
