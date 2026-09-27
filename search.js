@@ -53,7 +53,7 @@
                     tileWalk.setFloorTiles(fd.info);
                     const valid = fd.points.map((p, k) => (k === i && k === 0 && fd.upFront) || p || { x: 0, y: 0 });
                     const d = tileWalk.shortest(valid, i, cols);
-                    for (const k of cols) row[k] = k === i ? 0 : Math.max(0, d[k] - walk.LB_SLACK);
+                    for (const k of cols) row[k] = k === i ? 0 : Math.max(0, d[k] - walk.lbSlack(i, k));
                 }
             }
             if (row[j] === undefined) row[j] = Infinity;
@@ -98,20 +98,18 @@
             return { limit };
         }
 
-        function fastestCost(seed, limit, bound) {
-            const lb = [];
+        function fastestCost(seed, limit, bound, known = []) {
+            const lb = [], per = [];
             let rest = 0;
-            for (let f = 0; f < limit; f++) { lb.push(cost(seed, f, 0, 1, false)); rest += lb[f]; }
-            if (rest > bound) return null;
-            const per = [];
+            for (let f = 0; f < limit; f++) { lb.push(known[f] ?? cost(seed, f, 0, 1, false)); rest += lb[f]; }
+            if (rest > bound) return { cost: null, per };
             let sum = 0;
             for (let f = 0; f < limit; f++) {
-                const c = cost(seed, f, 0, 1, true);
-                if (c === Infinity) return null;
-                per.push(c);
+                const c = known[f] ?? cost(seed, f, 0, 1, true);
+                per[f] = c;
                 sum += c;
                 rest -= lb[f];
-                if (sum + rest > bound) return null;
+                if (c === Infinity || sum + rest > bound) return { cost: null, per };
             }
             return { cost: sum, per };
         }
@@ -158,10 +156,16 @@
                         const hit = fastestHit(eng, job, seed, r);
                         if (!hit) continue;
                         hits++;
+                        const meta = { name: eng.mapName, type: C.ENV_NAMES[eng.env][0], boss: eng.bossName, fc: eng.floorCount };
+                        if (job.lowerBounds) {
+                            const lbs = [];
+                            for (let f = 0; f < hit.limit; f++) lbs.push(cost(seed, f, 0, 1, false));
+                            insert(Object.assign(base, meta, { cost: lbs.reduce((a, c) => a + c, 0), lbs }));
+                            continue;
+                        }
                         const res = fastestCost(seed, hit.limit, bound());
-                        if (!res) continue;
-                        insert(Object.assign(base, { name: eng.mapName, type: C.ENV_NAMES[eng.env][0], boss: eng.bossName, fc: eng.floorCount,
-                                                     cost: res.cost, per: res.per }));
+                        if (res.cost === null) continue;
+                        insert(Object.assign(base, meta, { cost: res.cost, per: res.per }));
                     } else {
                         const rows = itemRows(eng, job, seed, r);
                         if (!rows) continue;
@@ -217,6 +221,11 @@
                 cancelled = false;
                 runJob(e.data.job).catch(err => self.postMessage({ type: 'error', gen: e.data.job.gen, message: String(err && err.stack || err) }));
             }
+            else if (e.data.type === 'exact') {
+                const { gen, seed, limit, bound, known } = e.data;
+                try { self.postMessage({ type: 'exact', gen, res: fastestCost(seed, limit, bound, known) }); }
+                catch (err) { self.postMessage({ type: 'error', gen, message: String(err && err.stack || err) }); }
+            }
             else if (e.data.type === 'route') {
                 let route = null, error = null;
                 try { route = routeOf(e.data.job, e.data.item); } catch (err) { error = String(err && err.stack || err); }
@@ -270,11 +279,12 @@
     }
 
     let pool = null, runGen = 0;
+    const FREES = ['done', 'exact', 'error'];
     function getPool() {
         if (pool) return pool;
         pool = { rts: [], idle: [], run: null };
         const onMessage = (i, m) => {
-            if ((m.type === 'done' || m.type === 'error') && !pool.idle.includes(i)) pool.idle.push(i);
+            if (FREES.includes(m.type) && !pool.idle.includes(i)) pool.idle.push(i);
             if (pool.run) pool.run(i, m);
         };
         for (let i = 0, n = workerCount(); i < n; i++) {
@@ -313,7 +323,7 @@
             if (!busy.size && (stopped || !queue.length)) finish();
         };
         p.run = (i, m) => {
-            if (m.gen !== undefined && m.gen !== gen) { if (m.type === 'done' || m.type === 'error') dispatch(); return; }
+            if (m.gen !== undefined && m.gen !== gen) { if (FREES.includes(m.type)) dispatch(); return; }
             if (m.type === 'error') {
                 stopped = true;
                 busy.forEach((_, j) => p.rts[j].post({ type: 'cancel' }));
@@ -327,12 +337,51 @@
             busy.delete(i);
             processed += m.processed;
             hits += m.hits;
-            top = top.concat(m.items).sort((x, y) => x.cost - y.cost || x.ord - y.ord).slice(0, job.topN);
+            top = top.concat(m.items).sort(byCost).slice(0, job.topN);
             report();
             dispatch();
         };
         dispatch();
         return { promise, cancel: () => { stopped = true; busy.forEach((_, j) => p.rts[j].post({ type: 'cancel' })); } };
+    }
+
+    const byCost = (x, y) => x.cost - y.cost || x.ord - y.ord;
+    function runFastestMap(job, onProgress) {
+        let stopped = false, stage = runJob(Object.assign({}, job, { lowerBounds: true, topN: Infinity }), onProgress);
+        const promise = stage.promise.then(first => new Promise((resolve, reject) => {
+            const p = getPool(), gen = ++runGen, cands = first.items, busy = new Map(), walked = new Map();
+            let next = 0, top = [];
+            const bound = () => top.length >= job.topN ? top[job.topN - 1].cost : Infinity;
+            const known = c => walked.get(c.seed) || [];
+            const add = (c, per, cost) => { top = top.concat([Object.assign({}, c, { cost, per: per.slice(0, c.lbs.length), lbs: undefined })]).sort(byCost).slice(0, job.topN); };
+            const done = () => stopped || next >= cands.length || cands[next].cost > bound();
+            const dispatch = () => {
+                while (!done() && p.idle.length) {
+                    const c = cands[next++], k = known(c), sum = c.lbs.reduce((a, lb, f) => a + (k[f] ?? lb), 0);
+                    if (sum === Infinity || sum > bound()) continue;
+                    if (c.lbs.every((_, f) => k[f] !== undefined)) { add(c, k, sum); continue; }
+                    const i = p.idle.shift();
+                    busy.set(i, c);
+                    p.rts[i].post({ type: 'exact', gen, seed: c.seed, limit: c.lbs.length, bound: bound(), known: k });
+                }
+                if (!busy.size && done()) { p.run = null; resolve({ items: top, hits: first.hits, workers: first.workers }); }
+            };
+            p.run = (i, m) => {
+                if (m.gen !== undefined && m.gen !== gen) { if (FREES.includes(m.type)) dispatch(); return; }
+                if (m.type === 'error') { stopped = true; p.run = null; reject(new Error(m.message)); return; }
+                if (m.type !== 'exact' || !busy.has(i)) return;
+                const c = busy.get(i), k = known(c).slice();
+                busy.delete(i);
+                m.res.per.forEach((v, f) => { if (v !== undefined && v !== null) k[f] = v; });
+                walked.set(c.seed, k);
+                if (m.res.cost !== null) add(c, m.res.per, m.res.cost);
+                onProgress({ processed: 1, hits: first.hits, text: `Ranking: ${walked.size} seeds walked, ${next} of ${cands.length} maps checked` }, 1);
+                dispatch();
+            };
+            stage = { cancel: () => { stopped = true; } };
+            dispatch();
+        }));
+        return { promise, cancel: () => stage.cancel() };
     }
 
     let core = null;
@@ -577,7 +626,8 @@
                 document.getElementById("srchResults").innerHTML = "";
                 btn.textContent = "STOP";
                 const t0 = Date.now();
-                running = runJob(job, (p, total) => setStatus(`${Math.floor(p.processed / total * 100)}% — ${p.hits} Found`));
+                running = (job.kind === 'fastest' && job.topN < Infinity ? runFastestMap : runJob)(job,
+                    (p, total) => setStatus(p.text || `${Math.floor(p.processed / total * 100)}% — ${p.hits} Found`));
                 running.btn = btn;
                 running.promise.then(res => {
                     const items = job.kind === 'item' ? shapeItems(res.items, job.preset) : res.items;
