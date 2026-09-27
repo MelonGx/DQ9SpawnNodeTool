@@ -5,7 +5,8 @@ function createIdealWalk(px = 16, tkg) {
     const GRID = px * SUB;
     const CELL = TILE / GRID;
     const CORRIDOR = 6;
-    const CHAR = CORRIDOR / 4, DOWN_HALF = CORRIDOR / 3 / 2, CHEST_HALF = CHAR / 2, UP_WIDTH = CHAR, UP_DEPTH = 2 * CHAR;
+    const CHEST = 1;
+    const CHAR = CORRIDOR / 4, DOWN_HALF = CORRIDOR / 3 / 2, CHEST_HALF = CHEST / 2, UP_WIDTH = CHAR, UP_DEPTH = 2 * CHAR;
     const SIZES = { corridor: CORRIDOR, char: CHAR, down: 2 * DOWN_HALF, chest: 2 * CHEST_HALF, upWidth: UP_WIDTH, upDepth: UP_DEPTH, step: 1 / SUB };
     const toPx = v => v * PX / TILE, fromPx = v => v * TILE / PX;
     const FOOT = px > 1 ? CHAR * SUB : 1;
