@@ -7,10 +7,14 @@ function createIdealWalk(px = 16, tkg) {
     const CORRIDOR = 6;
     const CHAR = CORRIDOR / 4, DOWN_HALF = CORRIDOR / 3 / 2, CHEST_HALF = CHAR / 2, UP_WIDTH = CHAR, UP_DEPTH = 2 * CHAR;
     const SIZES = { corridor: CORRIDOR, char: CHAR, down: 2 * DOWN_HALF, chest: 2 * CHEST_HALF, upWidth: UP_WIDTH, upDepth: UP_DEPTH, step: 1 / SUB };
-    const LB_SLACK = 2 * Math.SQRT2 * (CHEST_HALF + CHAR + 1 / SUB) / PX;
     const toPx = v => v * PX / TILE, fromPx = v => v * TILE / PX;
     const FOOT = px > 1 ? CHAR * SUB : 1;
     const DIAG_EXTRA = Math.SQRT2 - 1;
+    const FRONT = 1;
+    const reach = (a, b) => (Math.max(a, b) + DIAG_EXTRA * Math.min(a, b)) / PX;
+    const SLACK_UP_START = reach(UP_WIDTH / 2, FRONT / 2), SLACK_UP_GOAL = reach(CHAR / 2, CHAR / 2);
+    const SLACK_DOWN = reach(DOWN_HALF + CHAR / 2, DOWN_HALF + CHAR / 2), SLACK_CHEST = Math.SQRT2 * (CHEST_HALF + CHAR + 1 / SUB) / PX;
+    const lbSlack = (i, j) => (i === 0 ? SLACK_UP_START : i === 1 ? SLACK_DOWN : SLACK_CHEST) + (j === 0 ? SLACK_UP_GOAL : j === 1 ? SLACK_DOWN : SLACK_CHEST);
 
     let free = null;
     let freeW = 0, freeH = 0;
@@ -90,8 +94,10 @@ function createIdealWalk(px = 16, tkg) {
                 return top;
             },
             drain() { const out = val.slice(0, n); n = 0; return out; },
+            clear() { n = 0; },
         };
     }
+    const keyHeap = makeKeyHeap();
 
     function isPinch(k, m) {
         const nw = isFree(k - 1, m - 1), ne = isFree(k, m - 1);
@@ -287,7 +293,8 @@ function createIdealWalk(px = 16, tkg) {
             for (const t of left) best = Math.min(best, octile(nodes[t].x - nodes[v].x, nodes[t].y - nodes[v].y));
             return best === Infinity ? 0 : best;
         };
-        const heap = makeKeyHeap();
+        const heap = keyHeap;
+        heap.clear();
         g[src] = 0;
         heap.push(h(src), src);
         while (heap.size && left.size) {
@@ -323,7 +330,7 @@ function createIdealWalk(px = 16, tkg) {
             return dx ? { x0: ux + lo, x1: ux + hi, y0: uz - UP_WIDTH / 2, y1: uz + UP_WIDTH / 2 }
                       : { x0: ux - UP_WIDTH / 2, x1: ux + UP_WIDTH / 2, y0: uz + lo, y1: uz + hi };
         };
-        return { front: box(0, d), body: box(0, -UP_DEPTH * d) };
+        return { front: box(0, FRONT * d), body: box(0, -UP_DEPTH * d) };
     }
 
     const posIndex = (x, y) => (x >= 0 && y >= 0 && x < freeW && y < freeH) ? y * freeW + x : -1;
@@ -410,7 +417,8 @@ function createIdealWalk(px = 16, tkg) {
             for (const b of aim) best = Math.min(best, octileSteps(Math.max(0, b.x0 - cx, cx - b.x1), Math.max(0, b.y0 - cy, cy - b.y1)));
             return best === Infinity ? 0 : best;
         };
-        const heap = makeKeyHeap();
+        const heap = keyHeap;
+        heap.clear();
         for (const start of starts) { g[start] = 0; heap.push(h(start), start); }
         while (heap.size && left.size) {
             const u = heap.pop();
@@ -568,5 +576,5 @@ function createIdealWalk(px = 16, tkg) {
         };
     }
 
-    return { TILE, GRID, SIZES, LB_SLACK, isOpenTile, setFloor, setFloorTiles, gridFrom, gridPath, shortest, floorModel };
+    return { TILE, GRID, SIZES, lbSlack, isOpenTile, setFloor, setFloorTiles, gridFrom, gridPath, shortest, floorModel };
 }
