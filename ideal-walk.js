@@ -9,7 +9,6 @@ function createIdealWalk(px = 16, tkg) {
     const SIZES = { corridor: CORRIDOR, char: CHAR, down: 2 * DOWN_HALF, chest: 2 * CHEST_HALF, upWidth: UP_WIDTH, upDepth: UP_DEPTH, step: 1 / SUB };
     const toPx = v => v * PX / TILE, fromPx = v => v * TILE / PX;
     const FOOT = px > 1 ? CHAR * SUB : 1;
-    const WALL_BAND = Math.ceil(CORRIDOR * SUB / 2);
     const DIAG_EXTRA = Math.SQRT2 - 1;
     const FRONT = 1;
     const reach = (a, b) => (Math.max(a, b) + DIAG_EXTRA * Math.min(a, b)) / PX;
@@ -19,7 +18,6 @@ function createIdealWalk(px = 16, tkg) {
 
     let free = null;
     let freeW = 0, freeH = 0;
-    let clearance = null;
 
     function isFree(cx, cy) {
         return cx >= 0 && cy >= 0 && cx < freeW && cy < freeH && free[cy * freeW + cx] === 1;
@@ -200,7 +198,6 @@ function createIdealWalk(px = 16, tkg) {
             for (let gx = 0; gx + FOOT <= GW; gx++) free[gy * GW + gx] = block[by + lo[gx]];
         }
         freeW = GW; freeH = GH;
-        clearance = null;
         corners = null;
     }
 
@@ -211,37 +208,7 @@ function createIdealWalk(px = 16, tkg) {
             for (let x = 0; x < width; x++) free[y * width + x] = isOpenTile(grid, x, y) ? 1 : 0;
         }
         freeW = width; freeH = height;
-        clearance = null;
         corners = null;
-    }
-
-    function floorClearance() {
-        if (clearance) return clearance;
-        const W = freeW, H = freeH;
-        clearance = new Uint8Array(W * H);
-        for (let y = 0; y < H; y++) {
-            for (let x = 0; x < W; x++) {
-                const i = y * W + x;
-                if (!free[i]) continue;
-                clearance[i] = Math.min(WALL_BAND,
-                    (x ? clearance[i - 1] : 0) + 1,
-                    (y ? clearance[i - W] : 0) + 1,
-                    (x && y ? clearance[i - W - 1] : 0) + 1,
-                    (x + 1 < W && y ? clearance[i - W + 1] : 0) + 1);
-            }
-        }
-        for (let y = H - 1; y >= 0; y--) {
-            for (let x = W - 1; x >= 0; x--) {
-                const i = y * W + x;
-                if (!free[i]) continue;
-                clearance[i] = Math.min(clearance[i],
-                    (x + 1 < W ? clearance[i + 1] : 0) + 1,
-                    (y + 1 < H ? clearance[i + W] : 0) + 1,
-                    (x + 1 < W && y + 1 < H ? clearance[i + W + 1] : 0) + 1,
-                    (x && y + 1 < H ? clearance[i + W - 1] : 0) + 1);
-            }
-        }
-        return clearance;
     }
 
     let corners = null;
@@ -437,28 +404,31 @@ function createIdealWalk(px = 16, tkg) {
     function gridPath(points, src, dst, stairs) {
         const W = freeW, N = W * freeH;
         const { step, starts: firsts, goals } = legSetup(points, stairs, src, dst);
-        const wallDistance = floorClearance();
+        const nearWall = c => {
+            const x = c % W, y = (c / W) | 0;
+            for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) if ((ox || oy) && !isFree(x + ox, y + oy)) return 1;
+            return 0;
+        };
         const ends = new Set(goals(dst));
         const S = N * 9;
-        const sa = new Int32Array(S).fill(-1), sb = new Int32Array(S), st = new Int32Array(S), sw = new Int32Array(S), sp = new Int32Array(S);
+        const sa = new Int32Array(S).fill(-1), sb = new Int32Array(S), st = new Int32Array(S), sw = new Int32Array(S);
         const prev = new Int32Array(S).fill(-1), done = new Uint8Array(S);
-        const compareTie = (w, p, t, w0, p0, t0) => w - w0 || p - p0 || t - t0;
-        const less = (a1, b1, w1, p1, t1, i) => {
+        const less = (a1, b1, t1, w1, i) => {
             if (sa[i] < 0) return true;
-            if (a1 === sa[i] && b1 === sb[i]) return compareTie(w1, p1, t1, sw[i], sp[i], st[i]) < 0;
+            if (a1 === sa[i] && b1 === sb[i]) return t1 < st[i] || (t1 === st[i] && w1 < sw[i]);
             return a1 + b1 * Math.SQRT2 < sa[i] + sb[i] * Math.SQRT2;
         };
         const h = c => { let m = Infinity; for (const e of ends) m = Math.min(m, octileSteps(c % W - e % W, ((c / W) | 0) - ((e / W) | 0))); return m; };
-        const heap = makeHeap((x, y) => Math.abs(x[0] - y[0]) > 1e-9 ? x[0] < y[0] : compareTie(x[1], x[2], x[3], y[1], y[2], y[3]) < 0);
+        const heap = makeHeap((x, y) => Math.abs(x[0] - y[0]) > 1e-9 ? x[0] < y[0] : (x[1] - y[1] || x[2] - y[2]) < 0);
         if (!firsts.length || !ends.size) return [];
         for (const start of firsts) {
             const s0 = start * 9 + 8;
-            sa[s0] = 0; heap.push([h(start), 0, 0, 0, 0, 0, s0]);
+            sa[s0] = 0; heap.push([h(start), 0, 0, 0, 0, s0]);
         }
         let end = -1;
         while (heap.size) {
-            const [, w, p, t, a, b, u] = heap.pop();
-            if (done[u] || a !== sa[u] || b !== sb[u] || w !== sw[u] || p !== sp[u] || t !== st[u]) continue;
+            const [, t, w, a, b, u] = heap.pop();
+            if (done[u] || a !== sa[u] || b !== sb[u] || t !== st[u] || w !== sw[u]) continue;
             done[u] = 1;
             const c = (u / 9) | 0, hd = u % 9;
             if (ends.has(c)) { end = u; break; }
@@ -466,11 +436,11 @@ function createIdealWalk(px = 16, tkg) {
                 const [ox, oy] = MOVES[d], n = step(c, ox, oy);
                 if (n < 0) continue;
                 const a1 = a + (ox && oy ? 0 : 1), b1 = b + (ox && oy ? 1 : 0);
-                const t1 = t + (hd !== 8 && hd !== d ? 1 : 0), w1 = w + (wallDistance[n] === 1 ? 1 : 0), p1 = p + WALL_BAND - wallDistance[n];
+                const t1 = t + (hd !== 8 && hd !== d ? 1 : 0), w1 = w + nearWall(n);
                 const v = n * 9 + d;
-                if (done[v] || !less(a1, b1, w1, p1, t1, v)) continue;
-                sa[v] = a1; sb[v] = b1; st[v] = t1; sw[v] = w1; sp[v] = p1; prev[v] = u;
-                heap.push([a1 + b1 * Math.SQRT2 + h(n), w1, p1, t1, a1, b1, v]);
+                if (done[v] || !less(a1, b1, t1, w1, v)) continue;
+                sa[v] = a1; sb[v] = b1; st[v] = t1; sw[v] = w1; prev[v] = u;
+                heap.push([a1 + b1 * Math.SQRT2 + h(n), t1, w1, a1, b1, v]);
             }
         }
         if (end < 0) return [];
