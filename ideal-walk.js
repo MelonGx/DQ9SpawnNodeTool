@@ -12,7 +12,7 @@ function createIdealWalk(px = 16, tkg) {
     const FOOT = px > 1 ? CHAR * SUB : 1;
     const DIAG_EXTRA = Math.SQRT2 - 1;
 
-    let free = null, clear = null;
+    let free = null;
     let freeW = 0, freeH = 0;
 
     function isFree(cx, cy) {
@@ -233,34 +233,21 @@ function createIdealWalk(px = 16, tkg) {
             }
         }
         while (top) around4(stack[--top], pushFloor);
-        const core = floor.slice();
-        const edge = [];
-        for (let i = 0; i < W * H; i++) {
-            if (floor[i] || cls[i] !== 1) continue;
-            const x = i % W, y = (i / W) | 0;
-            if ((x > 0 && floor[i - 1]) || (x < W - 1 && floor[i + 1]) || (y > 0 && floor[i - W]) || (y < H - 1 && floor[i + W])) edge.push(i);
-        }
-        for (const i of edge) floor[i] = 1;
         const GW = mapWidth * GRID, GH = mapHeight * GRID;
-        const span = Math.floor((FOOT - 1) / SUB) + 1, lo = new Int32Array(Math.max(GW, GH)), mid = new Int32Array(lo.length);
-        for (let g = 0; g < lo.length; g++) { lo[g] = Math.floor(g / SUB); mid[g] = Math.floor((g + FOOT / 2) / SUB); }
-        const blockFloor = new Uint8Array(W * H), blockCore = new Uint8Array(W * H);
+        const span = Math.floor((FOOT - 1) / SUB) + 1, lo = new Int32Array(Math.max(GW, GH));
+        for (let g = 0; g < lo.length; g++) lo[g] = Math.floor(g / SUB);
+        const block = new Uint8Array(W * H);
         for (let y = 0; y + span <= H; y++) {
             for (let x = 0; x + span <= W; x++) {
-                let f = 1, c = 1;
-                for (let j = y * W + x, dy = 0; dy < span; dy++, j += W) for (let dx = 0; dx < span; dx++) { f &= floor[j + dx]; c &= core[j + dx]; }
-                blockFloor[y * W + x] = f; blockCore[y * W + x] = c;
+                let f = 1;
+                for (let j = y * W + x, dy = 0; dy < span; dy++, j += W) for (let dx = 0; dx < span; dx++) f &= floor[j + dx];
+                block[y * W + x] = f;
             }
         }
         free = new Uint8Array(GW * GH);
-        clear = new Uint8Array(GW * GH);
         for (let gy = 0; gy + FOOT <= GH; gy++) {
-            const by = lo[gy] * W, cy = mid[gy] * W;
-            for (let gx = 0; gx + FOOT <= GW; gx++) {
-                const k = by + lo[gx], f = core[cy + mid[gx]] & blockFloor[k];
-                free[gy * GW + gx] = f;
-                clear[gy * GW + gx] = f & blockCore[k];
-            }
+            const by = lo[gy] * W;
+            for (let gx = 0; gx + FOOT <= GW; gx++) free[gy * GW + gx] = block[by + lo[gx]];
         }
         freeW = GW; freeH = GH;
         corners = null;
@@ -378,7 +365,7 @@ function createIdealWalk(px = 16, tkg) {
             if (!pass(u, v)) return -1;
             if (!ox || !oy) return v;
             const a = u + ox, b = u + oy * freeW;
-            return clear[v] && clear[a] && clear[b] && pass(u, a) && pass(u, b) ? v : -1;
+            return pass(u, a) && pass(u, b) ? v : -1;
         };
         const standing = i => i >= 0 && free[i] === 1 && !hard[i] && !chest[i];
         const goals = j => {
