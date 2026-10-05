@@ -18,6 +18,9 @@
         .app.stacked .map-pin { display: block; margin: 4px auto 0; background: #2d2d2d; border: 1px solid #555; color: #d4d4d4;
                                 font-family: monospace; font-size: 16px; padding: 4px 12px; border-radius: 4px; }
         html { -webkit-text-size-adjust: 100%; }
+        @supports (zoom: 1) {
+            .grid-wrapper, #topOverlay { transform: none !important; zoom: var(--map-zoom); }
+        }
         .tip { position: relative; display: inline-block; margin-left: 4px; color: #888; cursor: help; font-weight: normal; }
         .tip:hover, .tip:focus { color: #fff; outline: none; }
         .tip-box { position: absolute; display: none; z-index: 20; max-width: min(320px, calc(100vw - 16px)); box-sizing: border-box;
@@ -80,16 +83,22 @@
         wrap.append(results);
     }
 
-    window.mapDisplaySize = () => {
+    const MAP_PX = document.getElementById("overlapCanvas").width;
+    const fitMap = () => {
         const cs = getComputedStyle(document.body);
         const w = document.documentElement.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
         const h = viewH();
         const short = h < 500 && w - SIDE_MIN_SHORT - GAP >= h - 20;
         const twoCols = w - SIDE_MIN - GAP >= 480 || short;
         app.classList.toggle("stacked", !twoCols);
-        if (!twoCols) return Math.max(200, Math.min(w, 1024, h - STACK_SIDE_MIN));
+        if (!twoCols) return Math.max(200, Math.min(w, MAP_PX, h - STACK_SIDE_MIN));
         if (short) return h - 20;
-        return Math.max(320, Math.min(1024, h - 20, w - SIDE_MIN - GAP));
+        return Math.max(320, Math.min(MAP_PX, h - 20, w - SIDE_MIN - GAP));
+    };
+    window.mapDisplaySize = () => {
+        const size = fitMap();
+        grid.style.setProperty("--map-zoom", size / MAP_PX);
+        return size;
     };
     const tipBox = document.createElement("div");
     tipBox.className = "tip-box";
