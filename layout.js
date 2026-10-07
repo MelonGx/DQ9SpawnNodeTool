@@ -2,6 +2,7 @@
     const SIDE_MIN = 440, GAP = 16;
     const SIDE_MIN_SHORT = 340;
     const STACK_SIDE_MIN = 300;
+    const PHONE_TEXT = 11, PHONE_CONTROL = 13;
 
     const style = document.createElement("style");
     style.textContent = `
@@ -39,12 +40,17 @@
             .app-side .srch-panel .srch-row input.srch-hex { width: 52px; }
         }
         @media (pointer: coarse) {
+            body { font-size: ${PHONE_TEXT}px; }
+            .app .panel label, .app input, .app select, .app button, .app.stacked .map-pin { font-size: ${PHONE_CONTROL}px; }
             input[type=checkbox] { width: 20px; height: 20px; vertical-align: middle; }
             .srch-table .srch-stop { padding: 6px 6px; }
             .dist-table td.pick { padding-top: 8px; padding-bottom: 8px; }
         }
     `;
     document.body.appendChild(style);
+    if (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) {
+        document.querySelector('meta[name="viewport"]').content += ", maximum-scale=1";
+    }
 
     const app = document.createElement("div");
     app.className = "app";
