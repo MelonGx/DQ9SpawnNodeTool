@@ -580,17 +580,154 @@ function createIdealWalk(px = 16, tkg) {
     return { TILE, GRID, SIZES, lbSlack, isOpenTile, setFloor, setFloorTiles, gridFrom, gridPath, shortest, floorModel };
 }
 
-(function allowChestsWhenUnreachable() {
-    const make = createIdealWalk, source = `${make}\n;(${allowChestsWhenUnreachable})();`;
-    createIdealWalk = function (...args) {
-        const walk = make(...args), { gridFrom, gridPath } = walk;
-        const ends = (points, stairs, a, b) => points.map((p, k) => k === a || k === b || stairs.some(s => s.k === k) ? p : null);
-        walk.gridFrom = (points, src, stairs, want) => gridFrom(points, src, stairs, want).map((d, j) =>
-            d === Infinity && j !== src && points[j] ? gridFrom(ends(points, stairs, src, j), src, stairs, j)[j] : d);
-        walk.gridPath = (points, src, dst, stairs) => {
-            const path = gridPath(points, src, dst, stairs);
-            return path.length ? path : gridPath(ends(points, stairs, src, dst), src, dst, stairs);
+(function thinWhenUnreachable() {
+    const make = createIdealWalk, text = String(make), source = `${text}\n;(${thinWhenUnreachable})();`;
+    const patch = (code, from, to) => {
+        if (code.split(from).length !== 2) throw new Error(`thinWhenUnreachable: "${from}" must appear exactly once in createIdealWalk`);
+        return code.replace(from, () => to);
+    };
+    const variant = patch(patch(text, 'const FOOT = px > 1 ? CHAR * SUB : 1;', 'const FOOT = px > 1 ? CHAR * SUB - THIN : 1;'),
+        'floorModel };', 'floorModel, legSetup, makeHeap, makeKeyHeap, octileSteps, isFree, MOVES, FOOT, CELL, get freeW() { return freeW; }, get freeH() { return freeH; } };');
+    const build = k => new Function('THIN', `return ${variant}`)(2 * k);
+
+    function thinLeg(F, T, k, points, stairs, src, dst, path) {
+        const W = F.freeW, N = W * F.freeH, shift = k * (W + 1);
+        const fat = F.legSetup(points, stairs, src, dst), thin = T.legSetup(points, stairs, src, dst);
+        const stands = f => fat.step(f, 0, 0) === f;
+        const leaving = new Uint8Array(N), todo = fat.starts.slice();
+        for (const f of todo) leaving[f] = 1;
+        while (todo.length) {
+            const f = todo.pop();
+            for (const [ox, oy] of F.MOVES) {
+                const v = fat.step(f, ox, oy);
+                if (v >= 0 && !leaving[v] && !stands(v)) { leaving[v] = 1; todo.push(v); }
+            }
+        }
+        const moves = new Int32Array(N * 8).fill(-2);
+        const move = (u, d) => {
+            const i = u * 8 + d;
+            if (moves[i] === -2) {
+                const [ox, oy] = F.MOVES[d], f = u % W >= k && u >= k * W ? u - shift : -1;
+                const v = f >= 0 && (leaving[f] || stands(f)) ? fat.step(f, ox, oy) : -1, w = v < 0 ? thin.step(u, ox, oy) : -1;
+                moves[i] = v >= 0 ? 2 * (v + shift) : w < 0 ? -1 : 2 * w + 1;
+            }
+            return moves[i];
         };
+        const starts = thin.starts.map(u => 2 * u + 1).concat(fat.starts.map(f => 2 * (f + shift)));
+        const ends = thin.goals(dst).concat(fat.goals(dst).map(f => f + shift)), goal = new Uint8Array(N);
+        let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+        for (const u of ends) {
+            goal[u] = 1;
+            const x = u % W, y = (u / W) | 0;
+            x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+        }
+        const h = u => { const x = u % W, y = (u / W) | 0; return F.octileSteps(Math.max(0, x0 - x, x - x1), Math.max(0, y0 - y, y - y1)); };
+        const rest = new Int32Array(N).fill(-1);
+        let level = ends.slice(), next = [];
+        for (const u of ends) rest[u] = 0;
+        for (let K = 0; level.length; K++, level = next, next = []) {
+            for (let i = 0; i < level.length; i++) {
+                const v = level[i];
+                if (rest[v] !== K) continue;
+                for (let d = 0; d < 8; d++) {
+                    const x = v % W - F.MOVES[d][0], y = ((v / W) | 0) - F.MOVES[d][1];
+                    if (x < 0 || y < 0 || x >= W || y >= F.freeH) continue;
+                    const u = y * W + x, r = move(u, d), ku = K + (r & 1);
+                    if (r < 0 || r >> 1 !== v || (rest[u] >= 0 && rest[u] <= ku)) continue;
+                    rest[u] = ku;
+                    (r & 1 ? next : level).push(u);
+                }
+            }
+        }
+        if (!path) {
+            const heap = F.makeKeyHeap(), BIG = 4 * N, c = new Float64Array(N).fill(Infinity), g = new Float64Array(N).fill(Infinity), closed = new Uint8Array(N);
+            const push = (u, c1, g1) => { if (rest[u] >= 0 && (c1 < c[u] || (c1 === c[u] && g1 < g[u]))) { c[u] = c1; g[u] = g1; heap.push((c1 + rest[u]) * BIG + g1 + h(u), u); } };
+            for (const s of starts) push(s >> 1, s & 1, 0);
+            while (heap.size) {
+                const u = heap.pop();
+                if (closed[u]) continue;
+                closed[u] = 1;
+                if (goal[u]) return g[u] / F.GRID;
+                for (let d = 0; d < 8; d++) {
+                    const r = move(u, d);
+                    if (r >= 0) push(r >> 1, c[u] + (r & 1), g[u] + (F.MOVES[d][0] && F.MOVES[d][1] ? Math.SQRT2 : 1));
+                }
+            }
+            return Infinity;
+        }
+        const S = N * 9;
+        const sc = new Int32Array(S), sa = new Int32Array(S).fill(-1), sb = new Int32Array(S), st = new Int32Array(S), sw = new Int32Array(S);
+        const prev = new Int32Array(S).fill(-1), done = new Uint8Array(S);
+        const better = (c1, a1, b1, t1, w1, i) => {
+            if (sa[i] < 0) return true;
+            if (c1 !== sc[i]) return c1 < sc[i];
+            if (a1 === sa[i] && b1 === sb[i]) return t1 < st[i] || (t1 === st[i] && w1 < sw[i]);
+            return a1 + b1 * Math.SQRT2 < sa[i] + sb[i] * Math.SQRT2;
+        };
+        const walls = new Int8Array(N).fill(-1);
+        const nearWall = u => {
+            if (walls[u] < 0) {
+                const x = u % W - k, y = ((u / W) | 0) - k;
+                walls[u] = 0;
+                for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) if ((ox || oy) && !F.isFree(x + ox, y + oy)) walls[u] = 1;
+            }
+            return walls[u];
+        };
+        const heap = F.makeHeap((p, q) => p[0] !== q[0] ? p[0] < q[0] : Math.abs(p[1] - q[1]) > 1e-9 ? p[1] < q[1] : (p[2] - q[2] || p[3] - q[3]) < 0);
+        for (const s of starts) {
+            const i = (s >> 1) * 9 + 8, c1 = s & 1;
+            if (rest[s >> 1] < 0 || !better(c1, 0, 0, 0, 0, i)) continue;
+            sc[i] = c1; sa[i] = 0;
+            heap.push([c1 + rest[s >> 1], h(s >> 1), 0, 0, 0, 0, i, c1]);
+        }
+        let end = -1;
+        while (heap.size) {
+            const [, , t, w, a, b, i, c] = heap.pop();
+            if (done[i] || c !== sc[i] || a !== sa[i] || b !== sb[i] || t !== st[i] || w !== sw[i]) continue;
+            done[i] = 1;
+            const u = (i / 9) | 0, hd = i % 9;
+            if (goal[u]) { end = i; break; }
+            for (let d = 0; d < 8; d++) {
+                const [ox, oy] = F.MOVES[d], r = move(u, d);
+                if (r < 0) continue;
+                const v = r >> 1, c1 = c + (r & 1), a1 = a + (ox && oy ? 0 : 1), b1 = b + (ox && oy ? 1 : 0);
+                const t1 = t + (hd !== 8 && hd !== d ? 1 : 0), w1 = w + nearWall(v), j = v * 9 + d;
+                if (rest[v] < 0 || done[j] || !better(c1, a1, b1, t1, w1, j)) continue;
+                sc[j] = c1; sa[j] = a1; sb[j] = b1; st[j] = t1; sw[j] = w1; prev[j] = i;
+                heap.push([c1 + rest[v], a1 + b1 * Math.SQRT2 + h(v), t1, w1, a1, b1, j, c1]);
+            }
+        }
+        if (end < 0) return [];
+        const cells = [];
+        for (let i = end; i >= 0; i = prev[i]) cells.unshift((i / 9) | 0);
+        const pts = cells.map(u => ({ x: (u % W + T.FOOT / 2) * T.CELL, y: (((u / W) | 0) + T.FOOT / 2) * T.CELL }));
+        return pts.filter((p, i) => {
+            if (i === 0 || i === pts.length - 1) return true;
+            const a = pts[i - 1], b = pts[i + 1];
+            return (p.x - a.x) !== (b.x - p.x) || (p.y - a.y) !== (b.y - p.y);
+        });
+    }
+
+    createIdealWalk = function (...args) {
+        const walk = make(...args), { setFloor, gridFrom, gridPath } = walk, levels = [];
+        let map = null;
+        const at = k => {
+            const l = levels[k] || (levels[k] = { walk: build(k)(...args), map: null });
+            if (l.map !== map) { l.walk.setFloor(map); l.map = map; }
+            return l.walk;
+        };
+        const squeeze = (points, stairs, src, dst, path) => {
+            for (let k = 1; map && at(0).FOOT - 2 * k >= 1; k++) {
+                const r = thinLeg(at(0), at(k), k, points, stairs, src, dst, path);
+                if (path ? r.length : r < Infinity) return r;
+            }
+            return path ? [] : Infinity;
+        };
+        walk.setFloor = m => { map = m; setFloor(m); };
+        walk.gridFrom = (points, src, stairs, want) => gridFrom(points, src, stairs, want).map((d, j) =>
+            d === Infinity && j !== src && points[j] ? squeeze(points, stairs, src, j, false) : d);
+        walk.gridPath = (points, src, dst, stairs) => gridFrom(points, src, stairs, dst)[dst] < Infinity
+            ? gridPath(points, src, dst, stairs) : squeeze(points, stairs, src, dst, true);
         return walk;
     };
     createIdealWalk.toString = () => source;
