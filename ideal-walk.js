@@ -579,3 +579,19 @@ function createIdealWalk(px = 16, tkg) {
 
     return { TILE, GRID, SIZES, lbSlack, isOpenTile, setFloor, setFloorTiles, gridFrom, gridPath, shortest, floorModel };
 }
+
+(function allowChestsWhenUnreachable() {
+    const make = createIdealWalk, source = `${make}\n;(${allowChestsWhenUnreachable})();`;
+    createIdealWalk = function (...args) {
+        const walk = make(...args), { gridFrom, gridPath } = walk;
+        const ends = (points, stairs, a, b) => points.map((p, k) => k === a || k === b || stairs.some(s => s.k === k) ? p : null);
+        walk.gridFrom = (points, src, stairs, want) => gridFrom(points, src, stairs, want).map((d, j) =>
+            d === Infinity && j !== src && points[j] ? gridFrom(ends(points, stairs, src, j), src, stairs, j)[j] : d);
+        walk.gridPath = (points, src, dst, stairs) => {
+            const path = gridPath(points, src, dst, stairs);
+            return path.length ? path : gridPath(ends(points, stairs, src, dst), src, dst, stairs);
+        };
+        return walk;
+    };
+    createIdealWalk.toString = () => source;
+})();
