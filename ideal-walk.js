@@ -588,10 +588,11 @@ function createIdealWalk(px = 16, tkg) {
     };
     const variant = patch(patch(text, 'const FOOT = px > 1 ? CHAR * SUB : 1;', 'const FOOT = px > 1 ? CHAR * SUB - THIN : 1;'),
         'floorModel };', 'floorModel, legSetup, makeHeap, makeKeyHeap, octileSteps, isFree, MOVES, FOOT, CELL, get freeW() { return freeW; }, get freeH() { return freeH; } };');
-    const build = k => new Function('THIN', `return ${variant}`)(2 * k);
+    const build = thin => new Function('THIN', `return ${variant}`)(thin);
+    const fatWalk = build(0), thinWalk = build(2), SHIFT = (fatWalk().FOOT - thinWalk().FOOT) / 2;
 
-    function thinLeg(F, T, k, points, stairs, src, dst, path) {
-        const W = F.freeW, N = W * F.freeH, shift = k * (W + 1);
+    function thinLeg(F, T, points, stairs, src, dst, path) {
+        const W = F.freeW, N = W * F.freeH, shift = SHIFT * (W + 1);
         const fat = F.legSetup(points, stairs, src, dst), thin = T.legSetup(points, stairs, src, dst);
         const stands = f => fat.step(f, 0, 0) === f;
         const leaving = new Uint8Array(N), todo = fat.starts.slice();
@@ -607,7 +608,7 @@ function createIdealWalk(px = 16, tkg) {
         const move = (u, d) => {
             const i = u * 8 + d;
             if (moves[i] === -2) {
-                const [ox, oy] = F.MOVES[d], f = u % W >= k && u >= k * W ? u - shift : -1;
+                const [ox, oy] = F.MOVES[d], f = u % W >= SHIFT && u >= SHIFT * W ? u - shift : -1;
                 const v = f >= 0 && (leaving[f] || stands(f)) ? fat.step(f, ox, oy) : -1, w = v < 0 ? thin.step(u, ox, oy) : -1;
                 moves[i] = v >= 0 ? 2 * (v + shift) : w < 0 ? -1 : 2 * w + 1;
             }
@@ -667,7 +668,7 @@ function createIdealWalk(px = 16, tkg) {
         const walls = new Int8Array(N).fill(-1);
         const nearWall = u => {
             if (walls[u] < 0) {
-                const x = u % W - k, y = ((u / W) | 0) - k;
+                const x = u % W - SHIFT, y = ((u / W) | 0) - SHIFT;
                 walls[u] = 0;
                 for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) if ((ox || oy) && !F.isFree(x + ox, y + oy)) walls[u] = 1;
             }
@@ -709,19 +710,12 @@ function createIdealWalk(px = 16, tkg) {
     }
 
     createIdealWalk = function (...args) {
-        const walk = make(...args), { setFloor, gridFrom, gridPath } = walk, levels = [];
-        let map = null;
-        const at = k => {
-            const l = levels[k] || (levels[k] = { walk: build(k)(...args), map: null });
-            if (l.map !== map) { l.walk.setFloor(map); l.map = map; }
-            return l.walk;
-        };
+        const walk = make(...args), { setFloor, gridFrom, gridPath } = walk;
+        let map = null, fat = null, thin = null, ready = null;
         const squeeze = (points, stairs, src, dst, path) => {
-            for (let k = 1; map && at(0).FOOT - 2 * k >= 1; k++) {
-                const r = thinLeg(at(0), at(k), k, points, stairs, src, dst, path);
-                if (path ? r.length : r < Infinity) return r;
-            }
-            return path ? [] : Infinity;
+            if (!fat) { fat = fatWalk(...args); thin = thinWalk(...args); }
+            if (ready !== map) { fat.setFloor(map); thin.setFloor(map); ready = map; }
+            return thinLeg(fat, thin, points, stairs, src, dst, path);
         };
         walk.setFloor = m => { map = m; setFloor(m); };
         walk.gridFrom = (points, src, stairs, want) => gridFrom(points, src, stairs, want).map((d, j) =>
