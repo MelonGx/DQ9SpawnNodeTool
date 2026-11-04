@@ -29,7 +29,7 @@
         `宝箱への歩行は宝箱の辺に接した時点で終わり（角だけの接触は不可）、宝箱からの歩行もそのような位置から出発します。` +
         `下り階段への歩行は、どの方向からでも階段に踏み込んだ時点で終わります。` +
         `単位＝マスの 1 辺。斜め 1 歩＝x・y ともマスの 1 辺。` +
-        `始点 / 終点 か表のセルで描くペアを選び、なし か – のセルで非表示。検索のルートは、ペアを 1 つ選ぶまで表示されたままです。`);
+        `スタート / 終点 か表のセルで描くペアを選び、なし か – のセルで非表示。検索のルートは、ペアを 1 つ選ぶまで表示されたままです。`);
 
     let state = null;
     let sel = { from: 'up', to: 'down' };
@@ -230,7 +230,7 @@
     function relabel() {
         document.getElementById("distTitle").textContent = W('Ideal Walk', '理想歩数');
         document.getElementById("distTip").dataset.tip = walkTip();
-        document.querySelector('label[for="distFrom"]').textContent = W('From', '始点');
+        document.querySelector('label[for="distFrom"]').textContent = W('From', 'スタート');
         document.querySelector('label[for="distTo"]').textContent = W('To', '終点');
     }
 
