@@ -191,7 +191,7 @@
         } else {
             result.innerHTML =
                 `<div>${W('Distance: ', '距離：')}<b>${fmt(d, 3)}</b> ${W('tiles', 'マス')} = ${splitText(d)} × √2</div>` +
-                `<div class="dist-muted">${W('A* (tile centres, no corner cutting): ', 'A*（マス中心、角抜けなし）：')}${fmt(state.dq9at[id], 1)} <span class="tip" tabindex="0" data-tip="${W('Tile centres, diagonal 1.5, no corner cutting. Only the tile edge is shared 1:1 with the ideal walk; shown for reference only.', 'マス中心、斜め 1.5、角抜けなし。理想歩行と 1:1 で共通なのはマスの辺だけで、参考として表示しています。')}">ⓘ</span></div>`;
+                `<div class="dist-muted">${W('A* (tile centres, no corner cutting): ', 'A*（マス中心、角抜けなし）：')}${fmt(state.dq9at[id], 1)} <span class="tip" tabindex="0" data-tip="${W('Tile centres, diagonal 1.5, no corner cutting. Only the tile edge is shared 1:1 with the ideal walk; shown for reference only.', 'マス中心、斜め 1.5、角抜けなし。理想歩数と 1:1 で共通なのはマスの辺だけで、参考として表示しています。')}">ⓘ</span></div>`;
         }
 
         const posRows = pts.map(p => {
@@ -228,7 +228,7 @@
     }
 
     function relabel() {
-        document.getElementById("distTitle").textContent = W('Ideal Walk', '理想歩行');
+        document.getElementById("distTitle").textContent = W('Ideal Walk', '理想歩数');
         document.getElementById("distTip").dataset.tip = walkTip();
         document.querySelector('label[for="distFrom"]').textContent = W('From', '始点');
         document.querySelector('label[for="distTo"]').textContent = W('To', '終点');
