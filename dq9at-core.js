@@ -197,9 +197,14 @@ class TreasureMap {
   chestItem(f, i, sec) {return this.chestItems(f, sec)[i];}
 
   get bossName() {return BOSS_NAMES[this.boss] ? BOSS_NAMES[this.boss][0] : "Unknown";}
+  get bossNameJP() {return BOSS_NAMES[this.boss] ? BOSS_NAMES[this.boss][2] : "不明";}
   get mapName() {
     if (!this.floorCount) return "Unknown";
     return `${PREFIX_NAMES[this.prefix][0]} ${LOCALE_NAMES[this.locale][0]} of ${SUFFIX_NAMES[this.suffix][0]} Lv.${this.lv}`;
+  }
+  get mapNameJP() {
+    if (!this.floorCount) return "Unknown";
+    return `${PREFIX_NAMES[this.prefix][1]}${SUFFIX_NAMES[this.suffix][1]}の${LOCALE_NAMES[this.locale][1]}Lv${this.lv}`;
   }
 }
 
@@ -1180,6 +1185,11 @@ const ITEMS_S_WEAPONS = ["Stardust sword","Poker","Deft dagger","Bright staff","
 const ITEMS_METAL_SLIME = ["Metal slime sword","Metal slime spear","Metal slime shield","Metal slime armour","Metal slime helm","Metal slime gauntlets","Metal slime sollerets"];
 const ITEM_GROUPS = new Map([['Millionaire', ITEMS_MILLIONAIRE], ['S weapon', ITEMS_S_WEAPONS], ['Metasla', ITEMS_METAL_SLIME]]);
 function expandItemGroup(v) {return ITEM_GROUPS.get(v) || [v];}
+const ITEM_GROUP_JP = {'Millionaire': '大富豪', 'S weapon': 'S武器'};
+const ITEM_JP = new Map(D_R);
+const itemName = (en, L) => L ? ITEM_GROUP_JP[en] || ITEM_JP.get(en) || en : en;
+const dispItem = en => `\uE000${en}\uE001`;
+const dispText = (text, L) => text.replace(/\uE000([^\uE001]*)\uE001/g, (_, en) => itemName(en, L));
 
 function getChestRanksForItems(itemNames){
   const ranks=[];
@@ -1306,7 +1316,7 @@ function scanWpFirstTwo(eng, p, fIdx, uniSec, wpSet, soloColor, hits, soloIdx, p
     if (uniSec != null) color = getQuickloadMark(p).mkColor;
     else if (t === STR_PARTY) color = "#ffd700";
     let rName = CHEST_RANK[eng.floors[fIdx].chests[b].rank] || '?';
-    hits.push(`<span style="color:${color};font-size:11px">B${fIdx + 1}F ${rName}${b + 1}: ${pHit ? pp : s} (${t})</span>`);
+    hits.push(`<span style="color:${color};font-size:11px">B${fIdx + 1}F ${rName}${b + 1}: ${dispItem(pHit ? pp : s)} (${t})</span>`);
     if (sHit) soloIdx.push(b);
     if (pHit) partyIdx.push(b);
     found = true;
@@ -1358,7 +1368,7 @@ const DUNGEON_CHECKERS = {
       if (p.checkItems.includes(p1) && p.checkItems.includes(p2)) {
         const res = {
           isHit: true, jumpFloor: f1,
-          displayHtml: `B${f1 + 1}F ${r1}3: ${p1}<br>B${f2 + 1}F ${r2}3: ${p2}`
+          displayHtml: `B${f1 + 1}F ${r1}3: ${dispItem(p1)}<br>B${f2 + 1}F ${r2}3: ${dispItem(p2)}`
         };
         if (p.wantAstar) {
           const up1 = eng.floors[f1].up, c1 = eng.floors[f1].chests[2], c2 = eng.floors[f2].chests[2];
@@ -1401,7 +1411,7 @@ const DUNGEON_CHECKERS = {
         if (fIdx >= eng.floorCount || eng.floors[fIdx].chests.length < 3 || eng.floors[fIdx].chests[2].rank !== 10) continue;
         const pItem = eng.chestItem(fIdx, 2, 2 + shift);
         if (pItem !== SOMA && pItem !== ELIXIR) continue;
-        const target = {floor: fIdx, det: `B${fIdx + 1}F S3: ${pItem}`};
+        const target = {floor: fIdx, det: `B${fIdx + 1}F S3: ${dispItem(pItem)}`};
         if (p.wantAstar) {
           const c3 = eng.floors[fIdx].chests[2];
           const tgt = [{g:fIdx, gx:c3.x, gy:c3.y}];
@@ -1469,7 +1479,7 @@ const DUNGEON_CHECKERS = {
         }
         if (foundSec !== -1) {
           c1Met = true;
-          matDet = `B3F ${b3Rank}3 (${foundSec + CHEST_TIMER_OFFSET}s): ${p.targetItem}`;
+          matDet = `B3F ${b3Rank}3 (${foundSec + CHEST_TIMER_OFFSET}s): ${dispItem(p.targetItem)}`;
         }
       }
 
@@ -1505,9 +1515,9 @@ const DUNGEON_CHECKERS = {
     const {valid:b4V, item:pB4, rank:b4Rank} = checkTKThirdChest(eng, 3, checkSec, 20+shift,
       currentB4Targets, p.isMillionaire ? p.strictMatTargets : currentB4Targets);
 
-    if (b3V && b4V) {c2Met = true; matDet = `B3F ${b3Rank}3 ${labelText}: ${pB3}<br>B4F ${b4Rank}3 ${labelText}: ${pB4}`;}
-    else if (b3V) {c1Met = true; matDet = `B3F ${b3Rank}3 ${labelText}: ${pB3}`;}
-    else if (b4V) {c1Met = true; matDet = `B4F ${b4Rank}3 ${labelText}: ${pB4}`;}
+    if (b3V && b4V) {c2Met = true; matDet = `B3F ${b3Rank}3 ${labelText}: ${dispItem(pB3)}<br>B4F ${b4Rank}3 ${labelText}: ${dispItem(pB4)}`;}
+    else if (b3V) {c1Met = true; matDet = `B3F ${b3Rank}3 ${labelText}: ${dispItem(pB3)}`;}
+    else if (b4V) {c1Met = true; matDet = `B4F ${b4Rank}3 ${labelText}: ${dispItem(pB4)}`;}
 
     if (c1Met || c2Met) {
       let html = `${wpHits.join('<br>')}<br><span style="color:#11F514;font-size:11px">${matDet}</span>`;
@@ -1545,7 +1555,7 @@ return {
     checkUltimateCondsMatch, checkOnlyMonPossible, checkElistAndD, chestCondsMatch,
     sharedRankFilter, buildOnlyMonExpectedStr,
     ITEM_BASIC_REQS, DUNGEON_CHECKERS, filterMapRanksBySMRAndChest, getChestRanksForItems,
-    expandItemGroup, b3fThreeItems, ITEMS_MILLIONAIRE, ITEMS_MILLIONAIRE_BOX3, row4, D_C, NO_ROW,
+    expandItemGroup, itemName, dispText, b3fThreeItems, ITEMS_MILLIONAIRE, ITEMS_MILLIONAIRE_BOX3, row4, D_C, NO_ROW,
     PREFIX_NAMES, SUFFIX_NAMES, LOCALE_NAMES, ENV_NAMES, BOSS_NAMES, MONSTER_DB, ONLY_MONSTERS,
     LOCATION_SEED_MAX, hasConditionValue, isCombinedElistMonsterSearch, parseLocationCode, parseBaseQuality,
     listVisitOrders,

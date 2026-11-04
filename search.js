@@ -116,6 +116,9 @@
 
         const plain = html => String(html || '').replace(/<br\s*\/?>/gi, ' / ').replace(/<[^>]*>/g, '')
             .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+        const hitText = html => [0, 1].map(L => C.dispText(plain(html), L));
+        const mapMeta = eng => ({ name: [eng.mapName, eng.mapNameJP], type: C.ENV_NAMES[eng.env],
+                                  boss: [eng.bossName, eng.bossNameJP], fc: eng.floorCount });
         function itemRows(eng, job, seed, r) {
             const conds = job.conds, p = job.params;
             const basicReq = C.ITEM_BASIC_REQS[p.checker];
@@ -126,9 +129,9 @@
             const hr = C.DUNGEON_CHECKERS[p.checker](eng, p);
             if (!hr || !hr.isHit) return null;
             const rows = hr.multi
-                ? hr.multi.map(row => ({ floor: row.floor, astar: row.astar, astarText: row.astarText, hit: plain(row.displayHtml),
+                ? hr.multi.map(row => ({ floor: row.floor, astar: row.astar, astarText: row.astarText, hit: hitText(row.displayHtml),
                                          isB10: !!row.isB10, isJfireB10: !!row.isJfireB10, isX3: !!row.isX3 }))
-                : [{ floor: hr.jumpFloor || 0, astar: hr.astar, astarText: hr.astarText, hit: plain(hr.displayHtml), isX3: !!hr.astarX3 }];
+                : [{ floor: hr.jumpFloor || 0, astar: hr.astar, astarText: hr.astarText, hit: hitText(hr.displayHtml), isX3: !!hr.astarX3 }];
             return rows.map(row => Object.assign(row, { cost: row.astar == null ? Infinity : row.astar }));
         }
 
@@ -156,7 +159,7 @@
                         const hit = fastestHit(eng, job, seed, r);
                         if (!hit) continue;
                         hits++;
-                        const meta = { name: eng.mapName, type: C.ENV_NAMES[eng.env][0], boss: eng.bossName, fc: eng.floorCount };
+                        const meta = mapMeta(eng);
                         if (job.lowerBounds) {
                             const lbs = [];
                             for (let f = 0; f < hit.limit; f++) lbs.push(cost(seed, f, 0, 1, false));
@@ -170,8 +173,8 @@
                         const rows = itemRows(eng, job, seed, r);
                         if (!rows) continue;
                         hits++;
-                        rows.forEach((row, k) => insert(Object.assign({}, base, row, { ord: base.ord * 4 + k,
-                            name: eng.mapName, boss: eng.bossName, fc: eng.floorCount })));
+                        const meta = mapMeta(eng);
+                        rows.forEach((row, k) => insert(Object.assign({}, base, row, meta, { ord: base.ord * 4 + k })));
                     }
                 }
                 if (Date.now() - lastPost > 200) {
@@ -522,6 +525,11 @@
             .srch-panel .srch-row > span { display: inline-flex; gap: 6px; align-items: center; }
             .srch-panel select, .srch-panel button { background: #1e1e1e; border: 1px solid #555; color: #fff; padding: 6px 8px; font-family: monospace; font-size: 16px; max-width: 100%; }
             .srch-panel button { cursor: pointer; }
+            .srch-panel .srch-title { align-self: stretch; }
+            .srch-panel .srch-row > span.lang-row { margin-left: auto; gap: 4px; }
+            .srch-panel .lang-sw { background: #224; color: #888; border-color: #444; border-radius: 4px; font-weight: bold; transition: all .15s; }
+            .srch-panel .lang-sw:hover { border-color: #00A2E8; color: #ccc; }
+            .srch-panel .lang-sw[aria-pressed=true] { background: #00A2E8; color: #fff; border-color: #00A2E8; }
             .srch-panel input.srch-hex { width: 70px; text-transform: uppercase; }
             .srch-panel .srch-note { color: #999; }
             .srch-panel .srch-head { color: #fff; font-weight: bold; }
@@ -568,7 +576,8 @@
         const panel = document.createElement("div");
         panel.className = "panel srch-panel";
         panel.innerHTML = `
-            <div class="srch-row"><b>Ideal Walk Search</b><span class="tip" tabindex="0" data-tip="Searches ranked by the ideal walk. Click a result to see its route floor by floor; click a floor to show it on the map.">ⓘ</span></div>
+            <div class="srch-row srch-title"><b>Ideal Walk Search</b><span class="tip" tabindex="0" data-tip="Searches ranked by the ideal walk. Click a result to see its route floor by floor; click a floor to show it on the map.">ⓘ</span>
+                <span class="lang-row">${LANGS.map((name, L) => `<button type="button" class="lang-sw" data-lang="${L}">${name}</button>`).join('')}</span></div>
             <div class="srch-row">
                 <span><input type="checkbox" id="srchAllRanks" checked><label for="srchAllRanks">Search all Ranks</label></span>
                 ${field('Rank', 'srchRank', `<select id="srchRank">${opts(rankOpts)}</select>`)}
@@ -644,6 +653,11 @@
         bind("srchCombo", comboJob);
         bind("srch3rd", thirdJob);
 
+        panel.querySelectorAll(".lang-sw").forEach(b => b.addEventListener("click", () => setLang(Number(b.dataset.lang))));
+        let saved = 0;
+        try { saved = Number(localStorage.getItem(LANG_KEY)) || 0; } catch (e) {}
+        setLang(LANGS[saved] ? saved : 0);
+
         document.getElementById("srchResults").addEventListener("click", e => {
             if (e.target.closest(".tip")) return;
             const stop = e.target.closest(".srch-stop");
@@ -652,6 +666,21 @@
             if (tr) toggleRoute(tr);
         });
     }
+
+    const LANGS = ['English', '日本語'], LANG_KEY = 'DQ9SpawnNodeTool.lang';
+    let lang = 0;
+    function setLang(L) {
+        lang = L;
+        try { localStorage.setItem(LANG_KEY, String(L)); } catch (e) {}
+        document.querySelectorAll(".srch-panel .lang-sw").forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.lang) === L)));
+        document.querySelectorAll("#srchItem option").forEach(o => { o.textContent = getCore().itemName(o.value, L); });
+        if (shown) document.querySelectorAll("#srchResults td[data-t]").forEach(td => {
+            td.textContent = cellText(shown.items[Number(td.parentElement.dataset.i)], td.dataset.t);
+        });
+    }
+    const cellText = (it, key) => key === 'hit'
+        ? it.hit[lang] + (it.astarText !== undefined ? ` (routes ${it.astarText})` : '') : it[key][lang];
+    const textCell = (it, key, cls) => `<td class="${cls}" data-t="${key}">${cellText(it, key)}</td>`;
 
     let shown = null, routeRt = null, routeSeq = 0;
     const routeWaiting = new Map();
@@ -707,8 +736,8 @@
         const rows = items.map((it, i) => {
             const per = it.per.map((c, f) => `B${f + 1}F ${c.toFixed(2)}`).join(' / ');
             return `<tr class="srch-pick" data-i="${i}" data-seed="${hex4(it.seed)}" title="Show the route">` +
-                   `<td>${i + 1}</td><td>${hex4(it.seed)}</td><td>${it.rStr}</td><td class="srch-left">${it.name}</td>` +
-                   `<td class="srch-left">${it.type}</td><td class="srch-left">${it.boss}</td><td>${it.fc}</td>` +
+                   `<td>${i + 1}</td><td>${hex4(it.seed)}</td><td>${it.rStr}</td>${textCell(it, 'name', 'srch-left')}` +
+                   `${textCell(it, 'type', 'srch-left')}${textCell(it, 'boss', 'srch-left')}<td>${it.fc}</td>` +
                    `<td><b>${fmt(it.cost)}</b><span class="tip" tabindex="0" data-tip="${per}">ⓘ</span></td></tr>`;
         }).join("");
         document.getElementById("srchResults").innerHTML = items.length ? head + rows : "";
@@ -719,10 +748,9 @@
         let n = 0;
         const rows = items.map((it, i) => {
             if (it.header) return `<tr><td colspan="7" class="srch-left"><b>${it.header}</b></td></tr>`;
-            const routes = it.astarText !== undefined ? ` (routes ${it.astarText})` : '';
             return `<tr class="srch-pick" data-i="${i}" data-seed="${hex4(it.seed)}" title="Show the route">` +
-                   `<td>${++n}</td><td>${hex4(it.seed)}</td><td>${it.rStr}</td><td class="srch-left">${it.name}</td><td>${it.fc}</td>` +
-                   `<td><b>${fmt(it.cost)}</b></td><td class="srch-floors">${it.hit}${routes}</td></tr>`;
+                   `<td>${++n}</td><td>${hex4(it.seed)}</td><td>${it.rStr}</td>${textCell(it, 'name', 'srch-left')}<td>${it.fc}</td>` +
+                   `<td><b>${fmt(it.cost)}</b></td>${textCell(it, 'hit', 'srch-floors')}</tr>`;
         }).join("");
         document.getElementById("srchResults").innerHTML = items.length ? head + rows : "";
     }
