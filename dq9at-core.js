@@ -1,8 +1,9 @@
 function DQ9AT_CORE(overrides) {
 const tkg = overrides && overrides.tkg;
-const STR_SOLO='Solo';
-const STR_PARTY='Party';
-const STR_BOTH='Solo+Party';
+const T = (en, jp) => `\uE000${en}\uE002${jp}\uE001`;
+const STR_SOLO=T('Solo','一人旅');
+const STR_PARTY=T('Party','即開');
+const STR_BOTH=T('Solo+Party','即+一人旅');
 const EL_P='Partially No-enemy';
 const EL_4='4-enemy';
 const EL_3='3-enemy';
@@ -1188,8 +1189,8 @@ function expandItemGroup(v) {return ITEM_GROUPS.get(v) || [v];}
 const ITEM_GROUP_JP = {'Millionaire': '大富豪', 'S weapon': 'S武器'};
 const ITEM_JP = new Map(D_R);
 const itemName = (en, L) => L ? ITEM_GROUP_JP[en] || ITEM_JP.get(en) || en : en;
-const dispItem = en => `\uE000${en}\uE001`;
-const dispText = (text, L) => text.replace(/\uE000([^\uE001]*)\uE001/g, (_, en) => itemName(en, L));
+const dispItem = en => T(en, itemName(en, 1));
+const dispText = (text, L) => text.replace(/\uE000([^\uE002]*)\uE002([^\uE001]*)\uE001/g, (_, en, jp) => L ? jp : en);
 
 function getChestRanksForItems(itemNames){
   const ranks=[];

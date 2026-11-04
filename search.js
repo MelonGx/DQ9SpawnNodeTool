@@ -1,7 +1,7 @@
 (function () {
     const ELIST_OPTIONS = [
-        ['MULTI_SPECIAL', 'Multi-Special-Floor'], ['SIZE_15', '15×15'], ['PARTIAL_NONE', 'Partially No-enemy'],
-        ['4', '4-enemy'], ['3', '3-enemy'], ['2', '2-enemy'], ['ONLY', 'ONLY (1-enemy)'], ['NONE', 'No-enemy'],
+        ['MULTI_SPECIAL', 'EL_M'], ['SIZE_15', '15×15'], ['PARTIAL_NONE', 'EL_P'],
+        ['4', 'EL_4'], ['3', 'EL_3'], ['2', 'EL_2'], ['ONLY', 'EL_1'], ['NONE', 'EL_0'],
     ];
     const ITEM_GROUPS = {
         og1: ['Ethereal stone', 'Lucida shard', 'Orichalcum', 'Gold bar', "Saint's ashes", 'Malicite', "Sorcerer's stone",
@@ -12,18 +12,49 @@
         og4: ['Silver platter', 'Glombolero', 'Brouhaha boomstick', "Hela's hammer", 'Depressing shoes', 'Unhappy hat', 'Divine dress'],
         og5: ['Cannibox', 'Mimic', "Pandora's box"],
     };
-    const MSG = {
-        A03: 'Sorry! Quickload search is not available for chest monsters.',
-        A05: 'Sorry! Searching for this item is currently unavailable.',
-        A08: 'No valid maps in this Seed range when filtering by location.',
-        A09: 'Invalid Location. Valid range: 01–96 (hex), digits 0–9 and A–F only.',
-        A10: 'Invalid Seed. Valid range: 0000–FFFF (hex), digits 0–9 and A–F only.',
-        A11: '"Only Monster" cannot be paired with ONLY (1-enemy) / No-enemy / 15x15 / Multi-special together.',
-        A13: 'Fastest Map Search does not support this option.',
-        A14: 'Fastest Map Search requires at least one of: Depth, Lv, Sp.Floor (ElistOfs), ONLY Monster, Location, or Boss.',
-        B07: 'Conditions conflict. All searches skipped.',
-        B08: 'Unable to match this Rank. Skipped.',
+    const LANGS = ['English', '日本語'], LANG_KEY = 'DQ9SpawnNodeTool.lang';
+    const TEXT = {
+        A03: ['Sorry! Quickload search is not available for chest monsters.', '宝箱モンスターは体感検索のみ対応しています。'],
+        A05: ['Sorry! Searching for this item is currently unavailable.', 'このアイテムの検索機能は現在未実装です。'],
+        A08: ['No valid maps in this Seed range when filtering by location.', '場所候補フィルター有効時、この Seed 範囲に該当する地図はありません！'],
+        A09: ['Invalid Location. Valid range: 01–96 (hex), digits 0–9 and A–F only.', '無効な場所コードです。有効な入力範囲：01–96（16進数）、0–9 および A–F のみ。'],
+        A10: ['Invalid Seed. Valid range: 0000–FFFF (hex), digits 0–9 and A–F only.', '無効な Seed です。有効な入力範囲：0000–FFFF（16進数）、0–9 および A–F のみ。'],
+        A11: ['"Only Monster" cannot be paired with ONLY (1-enemy) / No-enemy / 15x15 / Multi-special together.', '「オンリーモンスター」は オンリー／敵無／15x15／複数の特殊フロア と併用できません。'],
+        A13: ['Fastest Map Search does not support this option.', '最短地図検索はこの選択肢に対応しておりません。'],
+        A14: ['Fastest Map Search requires at least one of: Depth, Lv, Sp.Floor (ElistOfs), ONLY Monster, Location, or Boss.', '最短地図検索では、深さ・Lv・特殊フロア (ElistOfs)・オンリーモンスター・場所・ボス のうち、少なくとも 1 つの入力が必要です。'],
+        B03: ['Found', '個'],
+        B07: ['Conditions conflict. All searches skipped.', '条件が矛盾しているため、全ての検索をスキップしました。'],
+        B08: ['Unable to match this Rank. Skipped.', 'この条件は選択した Rank では不可能です。スキップしました。'],
+        C01: ['Map', '地図名'],
+        C02: ['Type', '地形'],
+        C03: ['SMR', '敵ランク'],
+        F01: ['Search all Ranks', '全てのRankを検索'],
+        F02: ['Valid Locations', '場所のある地図のみ'],
+        G03: ['Prefix', '地図名1'],
+        G04: ['Suffix', '地図名2'],
+        G05: ['Locale', '地図名3'],
+        G06: ['Location', '場所'],
+        G10: ['Depth', '深さ'],
+        G12: ['Sp.Floor', '特殊フロア'],
+        G13: ['ONLY Monster', 'オンリーモンスター'],
+        G14: ['Seed Range (Hex)', 'Seed 範囲 (Hex)'],
+        G16: ['B3/B4/B9 Solo･Party / Combo / 3rd Chest (B13:S3)', 'B3/B4/B9 即開･一人旅 / 体感 / 整列箱 (B13:S整列)'],
+        GBQ: ['Base Quality', 'Base値'],
+        H00: ['Chest Timer Search', '中断技 検索'],
+        H01: ['QL', '即一人旅'],
+        H02: ['Combo', '体感'],
+        H03: ['3rd', '整列箱'],
+        EL_M: ['Multi-Special-Floor', '複数の特殊フロア'],
+        EL_P: ['Partially No-enemy', '部分敵無'],
+        EL_4: ['4-enemy', '敵減 4 種'],
+        EL_3: ['3-enemy', '敵減 3 種'],
+        EL_2: ['2-enemy', '敵減 2 種'],
+        EL_1: ['ONLY (1-enemy)', 'オンリー'],
+        EL_0: ['No-enemy', '敵無'],
     };
+    let lang = 0;
+    const word = k => TEXT[k] ? TEXT[k][lang] : k;
+    const wordAttr = k => TEXT[k] ? ` data-text="${k}"` : '';
 
     function searchRuntime(self) {
         const tkg = TKG_GEN();
@@ -410,7 +441,7 @@
     function baseJob(conds, filterRanks) {
         const C = getCore();
         const loc = C.parseLocationCode(conds.location), bq = C.parseBaseQuality(conds.bq);
-        if (Number.isNaN(loc) || Number.isNaN(bq)) { setStatus(MSG.B07); return null; }
+        if (Number.isNaN(loc) || Number.isNaN(bq)) { setStatus(() => word('B07')); return null; }
         let startSeed = conds.seedMin ? parseInt(conds.seedMin, 16) : 0;
         let endSeed = conds.seedMax ? parseInt(conds.seedMax, 16) : 0xFFFF;
         if (isNaN(startSeed) || startSeed < 0) startSeed = 0;
@@ -418,21 +449,21 @@
         if (startSeed > endSeed) [startSeed, endSeed] = [endSeed, startSeed];
         const searchFilterLoc = checked('srchFilterLoc');
         if (searchFilterLoc) endSeed = Math.min(endSeed, C.LOCATION_SEED_MAX);
-        if (startSeed > endSeed) { alert(MSG.A08); return null; }
+        if (startSeed > endSeed) { alert(word('A08')); return null; }
         const locationCap = (C.hasConditionValue(conds.location) || C.hasConditionValue(conds.bq)) ? C.LOCATION_SEED_MAX : 0xFFFF;
         endSeed = Math.min(endSeed, locationCap);
         let ranks = checked('srchAllRanks') ? C.MAP_RANK.slice() : [parseInt(val('srchRank'), 16)];
         ranks = filterRanks(ranks, conds);
-        if (!ranks.length) { setStatus(MSG.B08); return null; }
+        if (!ranks.length) { setStatus(() => word('B08')); return null; }
         return { conds, ranks, startSeed, endSeed, searchFilterLoc };
     }
 
     function fastestJob() {
         const C = getCore(), conds = getConds();
-        if (conds.onlyMon && conds.elist && !C.isCombinedElistMonsterSearch(conds)) { alert(MSG.A11); return null; }
-        if (conds.elist === 'MULTI_SPECIAL') { alert(MSG.A13); return null; }
+        if (conds.onlyMon && conds.elist && !C.isCombinedElistMonsterSearch(conds)) { alert(word('A11')); return null; }
+        if (conds.elist === 'MULTI_SPECIAL') { alert(word('A13')); return null; }
         const mode = (conds.elist || conds.onlyMon) ? 'floor' : 'map';
-        if (mode === 'map' && !(conds.depth || conds.lv || conds.elist || conds.onlyMon || conds.location || conds.boss)) { alert(MSG.A14); return null; }
+        if (mode === 'map' && !(conds.depth || conds.lv || conds.elist || conds.onlyMon || conds.location || conds.boss)) { alert(word('A14')); return null; }
         const job = baseJob(conds, C.sharedRankFilter);
         if (!job) return null;
         return Object.assign(job, { kind: 'fastest', mode, topN: mode === 'floor' ? Infinity : 50 });
@@ -447,7 +478,7 @@
     }
     function quickloadTarget() {
         const C = getCore(), targetItem = val('srchItem'), isB9F = itemGroup() === 'ogS';
-        if (itemGroup() === 'og5') { alert(MSG.A03); return null; }
+        if (itemGroup() === 'og5') { alert(word('A03')); return null; }
         const checkItems = C.expandItemGroup(targetItem);
         const isThree = C.b3fThreeItems.includes(targetItem);
         return { targetItem, isB9F, checkItems, reqCount: isB9F ? 2 : isThree ? 3 : 2, targetFloors: isB9F ? [8] : isThree ? [2] : [2, 3] };
@@ -486,14 +517,14 @@
         else if (targetItem === 'Fuddle bow') { wpTargets = ['Fuddle bow']; strictMatTargets = ['Mirrorstone']; }
         else if (targetItem === 'Slime shield') { wpTargets = ['Slime shield']; strictMatTargets = ['Iron ore']; }
         else if (targetItem === "Sorcerer's stone") { wpTargets = ["Sorcerer's stone"]; strictMatTargets = ['670G']; }
-        else { alert(MSG.A05); return null; }
+        else { alert(word('A05')); return null; }
         const allMatTargets = isMillionaire ? broadMatTargets : strictMatTargets;
         return itemJob('tk', (ranks, conds) => C.filterMapRanksBySMRAndChest(ranks, conds, [C.getChestRanksForItems(wpTargets), C.getChestRanksForItems(allMatTargets)], 0),
                        { targetItem, wpTargets, strictMatTargets, broadMatTargets, isMillionaire, isMonsterBox, minSec, maxSec, qlSec: sec, wantAstar: true });
     }
     function thirdJob() {
         const C = getCore(), targetValue = val('srchItem');
-        if (!['Ethereal stone', 'Lucida shard', 'Sainted soma', "Hephaestus' flame", 'Millionaire'].includes(targetValue)) { alert(MSG.A05); return null; }
+        if (!['Ethereal stone', 'Lucida shard', 'Sainted soma', "Hephaestus' flame", 'Millionaire'].includes(targetValue)) { alert(word('A05')); return null; }
         const isS3 = targetValue === 'Sainted soma';
         const checkItems = isS3 ? ["Sage's elixir", 'Sainted soma'] : targetValue === 'Millionaire' ? C.ITEMS_MILLIONAIRE_BOX3 : [targetValue];
         const targetFloors = isS3 ? [12, 13] : [2, 3];
@@ -514,7 +545,8 @@
         return arr;
     }
 
-    function setStatus(text) { document.getElementById("srchStatus").textContent = text; }
+    let statusText = null;
+    function setStatus(text) { statusText = text; document.getElementById("srchStatus").textContent = text(); }
 
     function buildPanel() {
         const C = getCore();
@@ -555,11 +587,14 @@
         `;
         document.body.appendChild(style);
 
-        const opts = list => list.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+        const opts = list => list.map(([v, t]) => `<option value="${v}"${wordAttr(t)}>${word(t)}</option>`).join('');
         const named = (obj, i1, i2) => Object.keys(obj).map(k => [k, `${obj[k][i1]} ${obj[k][i2]}`]);
         const sel = (id, list) => `<select id="${id}"><option value="">------</option>${opts(list)}</select>`;
-        const field = (label, id, html) => `<span><label for="${id}">${label}</label>${html}</span>`;
-        const cell = (label, id, html) => `<div class="srch-cell"><label for="${id}">${label}</label>${html}</div>`;
+        const label = (k, id) => `<label for="${id}"${wordAttr(k)}>${word(k)}</label>`;
+        const field = (k, id, html) => `<span>${label(k, id)}${html}</span>`;
+        const cell = (k, id, html) => `<div class="srch-cell">${label(k, id)}${html}</div>`;
+        const button = (id, k) => `<button id="${id}" data-label="${k}">${word(k)}</button>`;
+        const ctTip = () => `${word('G16')}. Routes as D / 5D / 9D; all hits, sorted by the ideal walk. Ultimate Search conditions above also apply.`;
         const num = (id, min, max) => `<input type="number" id="${id}" min="${min}" max="${max}">`;
 
         const onlyMon = [], seen = new Set(['0B5', '01B', '0B9']);
@@ -579,39 +614,39 @@
             <div class="srch-row srch-title"><b>Ideal Walk Search</b><span class="tip" tabindex="0" data-tip="Searches ranked by the ideal walk. Click a result to see its route floor by floor; click a floor to show it on the map.">ⓘ</span>
                 <span class="lang-row">${LANGS.map((name, L) => `<button type="button" class="lang-sw" data-lang="${L}">${name}</button>`).join('')}</span></div>
             <div class="srch-row">
-                <span><input type="checkbox" id="srchAllRanks" checked><label for="srchAllRanks">Search all Ranks</label></span>
+                <span><input type="checkbox" id="srchAllRanks" checked>${label('F01', 'srchAllRanks')}</span>
                 ${field('Rank', 'srchRank', `<select id="srchRank">${opts(rankOpts)}</select>`)}
-                <span><input type="checkbox" id="srchFilterLoc"><label for="srchFilterLoc">Valid Locations</label></span>
+                <span><input type="checkbox" id="srchFilterLoc">${label('F02', 'srchFilterLoc')}</span>
             </div>
             <div class="srch-head">Ultimate Search</div>
             <div class="srch-grid">
-                ${cell('Prefix', 'srchPrefix', sel('srchPrefix', named(C.PREFIX_NAMES, 0, 1)))}
-                ${cell('Suffix', 'srchSuffix', sel('srchSuffix', named(C.SUFFIX_NAMES, 0, 1)))}
-                ${cell('Locale', 'srchLocale', sel('srchLocale', named(C.LOCALE_NAMES, 0, 1)))}
-                ${cell('Type', 'srchEnv', sel('srchEnv', named(C.ENV_NAMES, 0, 1)))}
+                ${cell('G03', 'srchPrefix', sel('srchPrefix', named(C.PREFIX_NAMES, 0, 1)))}
+                ${cell('G04', 'srchSuffix', sel('srchSuffix', named(C.SUFFIX_NAMES, 0, 1)))}
+                ${cell('G05', 'srchLocale', sel('srchLocale', named(C.LOCALE_NAMES, 0, 1)))}
+                ${cell('C02', 'srchEnv', sel('srchEnv', named(C.ENV_NAMES, 0, 1)))}
                 ${cell('Lv', 'srchLv', num('srchLv', 1, 99))}
-                ${cell('SMR', 'srchMonster', num('srchMonster', 1, 9))}
-                ${cell('Depth', 'srchDepth', num('srchDepth', 2, 16))}
-                ${cell('Location', 'srchLocation', '<input type="text" class="srch-hex" id="srchLocation" maxlength="2" placeholder="96">')}
-                ${cell('Base Quality', 'srchBq', num('srchBq', 2, 248))}
+                ${cell('C03', 'srchMonster', num('srchMonster', 1, 9))}
+                ${cell('G10', 'srchDepth', num('srchDepth', 2, 16))}
+                ${cell('G06', 'srchLocation', '<input type="text" class="srch-hex" id="srchLocation" maxlength="2" placeholder="96">')}
+                ${cell('GBQ', 'srchBq', num('srchBq', 2, 248))}
                 ${cell('BOSS', 'srchBoss', sel('srchBoss', named(C.BOSS_NAMES, 0, 2)))}
-                ${cell('Sp.Floor', 'srchElist', sel('srchElist', ELIST_OPTIONS))}
-                ${cell('ONLY Monster', 'srchOnlyMon', sel('srchOnlyMon', onlyMon))}
+                ${cell('G12', 'srchElist', sel('srchElist', ELIST_OPTIONS))}
+                ${cell('G13', 'srchOnlyMon', sel('srchOnlyMon', onlyMon))}
             </div>
             <div class="srch-boxes">${boxes.join('')}</div>
             <div class="srch-row">
-                <span><label for="srchSeedMin">Seed Range (Hex)</label>
+                <span>${label('G14', 'srchSeedMin')}
                 <input type="text" class="srch-hex" id="srchSeedMin" maxlength="4" placeholder="0000"> -
                 <input type="text" class="srch-hex" id="srchSeedMax" maxlength="4" placeholder="FFFF"></span>
-                <button id="srchGo" data-label="Search">Search</button><span class="tip" tabindex="0" data-tip="Fastest Map: entrance to the boss floor (top 50). With Sp.Floor (ElistOfs) or ONLY Monster, Fastest Floor: up to the floor before the special floor (all hits).">ⓘ</span>
+                ${button('srchGo', 'Search')}<span class="tip" tabindex="0" data-tip="Fastest Map: entrance to the boss floor (top 50). With Sp.Floor (ElistOfs) or ONLY Monster, Fastest Floor: up to the floor before the special floor (all hits).">ⓘ</span>
             </div>
-            <div class="srch-head">Chest Timer Search <span class="tip" tabindex="0" data-tip="B3/B4/B9 Solo･Party / Combo / 3rd Chest (B13:S3). Routes as D / 5D / 9D; all hits, sorted by the ideal walk. Ultimate Search conditions above also apply.">ⓘ</span></div>
+            <div class="srch-head"><span${wordAttr('H00')}>${word('H00')}</span> <span class="tip" tabindex="0" id="srchCtTip" data-tip="${ctTip()}">ⓘ</span></div>
             <div class="srch-row">
                 <select id="srchQlMode"><option value="D">D</option><option value="5D">5D</option><option value="9D">9D</option></select>
                 <select id="srchItem">${items}</select>
-                <button id="srchQL" data-label="QL">QL</button>
-                <button id="srchCombo" data-label="Combo">Combo</button>
-                <button id="srch3rd" data-label="3rd">3rd</button>
+                ${button('srchQL', 'H01')}
+                ${button('srchCombo', 'H02')}
+                ${button('srch3rd', 'H03')}
             </div>
             <div class="srch-note" id="srchStatus"></div>
             <table class="srch-table" id="srchResults"></table>
@@ -620,11 +655,11 @@
 
         const hexCheck = (id, min, max, msg) => document.getElementById(id).addEventListener("change", e => {
             const v = e.target.value.trim();
-            if (v && (!/^[0-9a-fA-F]+$/.test(v) || parseInt(v, 16) < min || parseInt(v, 16) > max)) { alert(msg); e.target.value = ''; }
+            if (v && (!/^[0-9a-fA-F]+$/.test(v) || parseInt(v, 16) < min || parseInt(v, 16) > max)) { alert(word(msg)); e.target.value = ''; }
         });
-        hexCheck("srchLocation", 0x01, 0x96, MSG.A09);
-        hexCheck("srchSeedMin", 0, 0xFFFF, MSG.A10);
-        hexCheck("srchSeedMax", 0, 0xFFFF, MSG.A10);
+        hexCheck("srchLocation", 0x01, 0x96, 'A09');
+        hexCheck("srchSeedMin", 0, 0xFFFF, 'A10');
+        hexCheck("srchSeedMax", 0, 0xFFFF, 'A10');
 
         let running = null;
         const bind = (btnId, makeJob) => {
@@ -637,15 +672,16 @@
                 btn.textContent = "STOP";
                 const t0 = Date.now();
                 running = (job.kind === 'fastest' && job.topN < Infinity ? runFastestMap : runJob)(job,
-                    (p, total) => setStatus(p.text || `${Math.floor(p.processed / total * 100)}% — ${p.hits} Found`));
+                    (p, total) => setStatus(() => p.text || `${Math.floor(p.processed / total * 100)}% — ${p.hits} ${word('B03')}`));
                 running.btn = btn;
                 running.promise.then(res => {
                     const items = job.kind === 'item' ? shapeItems(res.items, job.preset) : res.items;
-                    setStatus(`Done: ${res.hits} Found (${((Date.now() - t0) / 1000).toFixed(1)} s, ${res.workers ? `${res.workers} ${res.workers > 1 ? 'workers' : 'worker'}` : 'main thread'})`);
+                    const secs = ((Date.now() - t0) / 1000).toFixed(1);
+                    setStatus(() => `Done: ${res.hits} ${word('B03')} (${secs} s, ${res.workers ? `${res.workers} ${res.workers > 1 ? 'workers' : 'worker'}` : 'main thread'})`);
                     shown = { job, items };
                     if (job.kind === 'item') renderItemResults(items); else renderFastestResults(items);
-                }).catch(err => setStatus("Error: " + err.message))
-                  .finally(() => { running = null; btn.textContent = btn.dataset.label; });
+                }).catch(err => setStatus(() => "Error: " + err.message))
+                  .finally(() => { running = null; btn.textContent = word(btn.dataset.label); });
             });
         };
         bind("srchGo", fastestJob);
@@ -653,6 +689,19 @@
         bind("srchCombo", comboJob);
         bind("srch3rd", thirdJob);
 
+        function setLang(L) {
+            lang = L;
+            try { localStorage.setItem(LANG_KEY, String(L)); } catch (e) {}
+            panel.querySelectorAll(".lang-sw").forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.lang) === L)));
+            panel.querySelectorAll("[data-text]").forEach(el => { el.textContent = word(el.dataset.text); });
+            panel.querySelectorAll("button[data-label]").forEach(b => { if (!running || running.btn !== b) b.textContent = word(b.dataset.label); });
+            document.getElementById("srchCtTip").dataset.tip = ctTip();
+            panel.querySelectorAll("#srchItem option").forEach(o => { o.textContent = C.itemName(o.value, L); });
+            if (shown) panel.querySelectorAll("#srchResults td[data-t]").forEach(td => {
+                td.textContent = cellText(shown.items[Number(td.parentElement.dataset.i)], td.dataset.t);
+            });
+            if (statusText) setStatus(statusText);
+        }
         panel.querySelectorAll(".lang-sw").forEach(b => b.addEventListener("click", () => setLang(Number(b.dataset.lang))));
         let saved = 0;
         try { saved = Number(localStorage.getItem(LANG_KEY)) || 0; } catch (e) {}
@@ -667,17 +716,6 @@
         });
     }
 
-    const LANGS = ['English', '日本語'], LANG_KEY = 'DQ9SpawnNodeTool.lang';
-    let lang = 0;
-    function setLang(L) {
-        lang = L;
-        try { localStorage.setItem(LANG_KEY, String(L)); } catch (e) {}
-        document.querySelectorAll(".srch-panel .lang-sw").forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.lang) === L)));
-        document.querySelectorAll("#srchItem option").forEach(o => { o.textContent = getCore().itemName(o.value, L); });
-        if (shown) document.querySelectorAll("#srchResults td[data-t]").forEach(td => {
-            td.textContent = cellText(shown.items[Number(td.parentElement.dataset.i)], td.dataset.t);
-        });
-    }
     const cellText = (it, key) => key === 'hit'
         ? it.hit[lang] + (it.astarText !== undefined ? ` (routes ${it.astarText})` : '') : it[key][lang];
     const textCell = (it, key, cls) => `<td class="${cls}" data-t="${key}">${cellText(it, key)}</td>`;
@@ -732,7 +770,7 @@
     const fmt = c => c === Infinity ? 'unreachable' : c.toFixed(3);
 
     function renderFastestResults(items) {
-        const head = `<tr><th>#</th><th>Seed</th><th>Rank</th><th class="srch-left">Map</th><th class="srch-left">Type</th><th class="srch-left">Boss</th><th>F</th><th>Steps</th></tr>`;
+        const head = `<tr><th>#</th><th>Seed</th><th>Rank</th><th class="srch-left"${wordAttr('C01')}>${word('C01')}</th><th class="srch-left"${wordAttr('C02')}>${word('C02')}</th><th class="srch-left">Boss</th><th>F</th><th>Steps</th></tr>`;
         const rows = items.map((it, i) => {
             const per = it.per.map((c, f) => `B${f + 1}F ${c.toFixed(2)}`).join(' / ');
             return `<tr class="srch-pick" data-i="${i}" data-seed="${hex4(it.seed)}" title="Show the route">` +
@@ -744,7 +782,7 @@
     }
 
     function renderItemResults(items) {
-        const head = `<tr><th>#</th><th>Seed</th><th>Rank</th><th class="srch-left">Map</th><th>F</th><th>Steps</th><th class="srch-left">Hit</th></tr>`;
+        const head = `<tr><th>#</th><th>Seed</th><th>Rank</th><th class="srch-left"${wordAttr('C01')}>${word('C01')}</th><th>F</th><th>Steps</th><th class="srch-left">Hit</th></tr>`;
         let n = 0;
         const rows = items.map((it, i) => {
             if (it.header) return `<tr><td colspan="7" class="srch-left"><b>${it.header}</b></td></tr>`;
