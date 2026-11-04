@@ -66,11 +66,13 @@
     const pin = document.createElement("button");
     pin.className = "map-pin";
     pin.type = "button";
-    pin.textContent = "Unpin Map";
-    pin.addEventListener("click", () => {
-        const off = mapCol.classList.toggle("unpinned");
-        pin.textContent = off ? "Pin Map" : "Unpin Map";
-    });
+    const pinText = () => {
+        const ja = document.documentElement.dataset.lang === 'ja', off = mapCol.classList.contains("unpinned");
+        pin.textContent = off ? (ja ? "マップを固定" : "Pin Map") : (ja ? "マップの固定を解除" : "Unpin Map");
+    };
+    pinText();
+    pin.addEventListener("click", () => { mapCol.classList.toggle("unpinned"); pinText(); });
+    document.addEventListener("langchange", pinText);
     mapCol.append(pin);
 
     const probe = document.createElement("div");

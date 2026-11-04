@@ -12,7 +12,7 @@
         og4: ['Silver platter', 'Glombolero', 'Brouhaha boomstick', "Hela's hammer", 'Depressing shoes', 'Unhappy hat', 'Divine dress'],
         og5: ['Cannibox', 'Mimic', "Pandora's box"],
     };
-    const LANGS = ['English', '日本語'], LANG_KEY = 'DQ9SpawnNodeTool.lang';
+    const LANGS = [['en', 'English'], ['ja', '日本語']], LANG_KEY = 'DQ9SpawnNodeTool.lang';
     const TEXT = {
         A03: ['Sorry! Quickload search is not available for chest monsters.', '宝箱モンスターは体感検索のみ対応しています。'],
         A05: ['Sorry! Searching for this item is currently unavailable.', 'このアイテムの検索機能は現在未実装です。'],
@@ -51,10 +51,35 @@
         EL_2: ['2-enemy', '敵減 2 種'],
         EL_1: ['ONLY (1-enemy)', 'オンリー'],
         EL_0: ['No-enemy', '敵無'],
+        C04: ['F', '深さ'],
+        title: ['Ideal Walk Search', '理想歩行検索'],
+        titleTip: ['Searches ranked by the ideal walk. Click a result to see its route floor by floor; click a floor to show it on the map.',
+                   '理想歩行で順位を付けた検索です。結果をクリックするとフロアごとのルートを表示し、フロアをクリックするとマップに表示します。'],
+        searchTip: ['Fastest Map: entrance to the boss floor (top 50). With Sp.Floor (ElistOfs) or ONLY Monster, Fastest Floor: up to the floor before the special floor (all hits).',
+                    '最短地図：入口からボスフロアまで（上位 50 件）。特殊フロア (ElistOfs) かオンリーモンスターを指定すると最短フロア：特殊フロアの 1 つ手前のフロアまで（全件）。'],
+        ctTip: ['. Routes as D / 5D / 9D; all hits, sorted by the ideal walk. Ultimate Search conditions above also apply.',
+                '。ルートは D / 5D / 9D の通り。全件を理想歩行の短い順に表示し、上の Ultimate Search の条件も適用されます。'],
+        done: ['Done: {0} ({1} s, {2})', '完了：{0}（{1} 秒、{2}）'],
+        workers: ['{0} workers', '{0} ワーカー'],
+        worker: ['{0} worker', '{0} ワーカー'],
+        mainThread: ['main thread', 'メインスレッド'],
+        ranking: ['Ranking: {0} seeds walked, {1} of {2} maps checked', 'ランキング：Seed {0} 個を歩行済み、地図 {2} 個中 {1} 個を確認'],
+        error: ['Error: {0}', 'エラー：{0}'],
+        steps: ['Steps', '歩数'],
+        hit: ['Hit', '該当'],
+        showRoute: ['Show the route', 'ルートを表示'],
+        route: ['Route:', 'ルート：'],
+        routeWorking: ['Route: working…', 'ルート：計算中…'],
+        routeNone: ['Route: not found.', 'ルート：見つかりません。'],
+        routeError: ['Route error:', 'ルートエラー：'],
+        routes: ['(routes {0})', '（ルート {0}）'],
+        unreachable: ['unreachable', '到達不可'],
     };
     let lang = 0;
     const word = k => TEXT[k] ? TEXT[k][lang] : k;
+    const fill = (k, ...a) => word(k).replace(/\{(\d)\}/g, (_, i) => a[i]);
     const wordAttr = k => TEXT[k] ? ` data-text="${k}"` : '';
+    const tipAttr = (...keys) => ` data-tip-text="${keys.join(' ')}" data-tip="${keys.map(word).join('')}"`;
 
     function searchRuntime(self) {
         const tkg = TKG_GEN();
@@ -410,7 +435,8 @@
                 m.res.per.forEach((v, f) => { if (v !== undefined && v !== null) k[f] = v; });
                 walked.set(c.seed, k);
                 if (m.res.cost !== null) add(c, m.res.per, m.res.cost);
-                onProgress({ processed: 1, hits: first.hits, text: `Ranking: ${walked.size} seeds walked, ${next} of ${cands.length} maps checked` }, 1);
+                const nums = [walked.size, next, cands.length];
+                onProgress({ processed: 1, hits: first.hits, text: () => fill('ranking', ...nums) }, 1);
                 dispatch();
             };
             stage = { cancel: () => { stopped = true; } };
@@ -594,7 +620,6 @@
         const field = (k, id, html) => `<span>${label(k, id)}${html}</span>`;
         const cell = (k, id, html) => `<div class="srch-cell">${label(k, id)}${html}</div>`;
         const button = (id, k) => `<button id="${id}" data-label="${k}">${word(k)}</button>`;
-        const ctTip = () => `${word('G16')}. Routes as D / 5D / 9D; all hits, sorted by the ideal walk. Ultimate Search conditions above also apply.`;
         const num = (id, min, max) => `<input type="number" id="${id}" min="${min}" max="${max}">`;
 
         const onlyMon = [], seen = new Set(['0B5', '01B', '0B9']);
@@ -611,8 +636,8 @@
         const panel = document.createElement("div");
         panel.className = "panel srch-panel";
         panel.innerHTML = `
-            <div class="srch-row srch-title"><b>Ideal Walk Search</b><span class="tip" tabindex="0" data-tip="Searches ranked by the ideal walk. Click a result to see its route floor by floor; click a floor to show it on the map.">ⓘ</span>
-                <span class="lang-row">${LANGS.map((name, L) => `<button type="button" class="lang-sw" data-lang="${L}">${name}</button>`).join('')}</span></div>
+            <div class="srch-row srch-title"><b${wordAttr('title')}>${word('title')}</b><span class="tip" tabindex="0"${tipAttr('titleTip')}>ⓘ</span>
+                <span class="lang-row">${LANGS.map(([, name], L) => `<button type="button" class="lang-sw" data-lang="${L}">${name}</button>`).join('')}</span></div>
             <div class="srch-row">
                 <span><input type="checkbox" id="srchAllRanks" checked>${label('F01', 'srchAllRanks')}</span>
                 ${field('Rank', 'srchRank', `<select id="srchRank">${opts(rankOpts)}</select>`)}
@@ -638,9 +663,9 @@
                 <span>${label('G14', 'srchSeedMin')}
                 <input type="text" class="srch-hex" id="srchSeedMin" maxlength="4" placeholder="0000"> -
                 <input type="text" class="srch-hex" id="srchSeedMax" maxlength="4" placeholder="FFFF"></span>
-                ${button('srchGo', 'Search')}<span class="tip" tabindex="0" data-tip="Fastest Map: entrance to the boss floor (top 50). With Sp.Floor (ElistOfs) or ONLY Monster, Fastest Floor: up to the floor before the special floor (all hits).">ⓘ</span>
+                ${button('srchGo', 'Search')}<span class="tip" tabindex="0"${tipAttr('searchTip')}>ⓘ</span>
             </div>
-            <div class="srch-head"><span${wordAttr('H00')}>${word('H00')}</span> <span class="tip" tabindex="0" id="srchCtTip" data-tip="${ctTip()}">ⓘ</span></div>
+            <div class="srch-head"><span${wordAttr('H00')}>${word('H00')}</span> <span class="tip" tabindex="0"${tipAttr('G16', 'ctTip')}>ⓘ</span></div>
             <div class="srch-row">
                 <select id="srchQlMode"><option value="D">D</option><option value="5D">5D</option><option value="9D">9D</option></select>
                 <select id="srchItem">${items}</select>
@@ -672,15 +697,16 @@
                 btn.textContent = "STOP";
                 const t0 = Date.now();
                 running = (job.kind === 'fastest' && job.topN < Infinity ? runFastestMap : runJob)(job,
-                    (p, total) => setStatus(() => p.text || `${Math.floor(p.processed / total * 100)}% — ${p.hits} ${word('B03')}`));
+                    (p, total) => setStatus(() => p.text ? p.text() : `${Math.floor(p.processed / total * 100)}% — ${p.hits} ${word('B03')}`));
                 running.btn = btn;
                 running.promise.then(res => {
                     const items = job.kind === 'item' ? shapeItems(res.items, job.preset) : res.items;
                     const secs = ((Date.now() - t0) / 1000).toFixed(1);
-                    setStatus(() => `Done: ${res.hits} ${word('B03')} (${secs} s, ${res.workers ? `${res.workers} ${res.workers > 1 ? 'workers' : 'worker'}` : 'main thread'})`);
+                    const n = res.workers;
+                    setStatus(() => fill('done', `${res.hits} ${word('B03')}`, secs, n ? fill(n > 1 ? 'workers' : 'worker', n) : word('mainThread')));
                     shown = { job, items };
                     if (job.kind === 'item') renderItemResults(items); else renderFastestResults(items);
-                }).catch(err => setStatus(() => "Error: " + err.message))
+                }).catch(err => setStatus(() => fill('error', err.message)))
                   .finally(() => { running = null; btn.textContent = word(btn.dataset.label); });
             });
         };
@@ -695,12 +721,15 @@
             panel.querySelectorAll(".lang-sw").forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.lang) === L)));
             panel.querySelectorAll("[data-text]").forEach(el => { el.textContent = word(el.dataset.text); });
             panel.querySelectorAll("button[data-label]").forEach(b => { if (!running || running.btn !== b) b.textContent = word(b.dataset.label); });
-            document.getElementById("srchCtTip").dataset.tip = ctTip();
+            panel.querySelectorAll("[data-tip-text]").forEach(el => { el.dataset.tip = el.dataset.tipText.split(' ').map(word).join(''); });
+            panel.querySelectorAll("#srchResults tr.srch-pick").forEach(tr => { tr.title = word('showRoute'); });
             panel.querySelectorAll("#srchItem option").forEach(o => { o.textContent = C.itemName(o.value, L); });
-            if (shown) panel.querySelectorAll("#srchResults td[data-t]").forEach(td => {
-                td.textContent = cellText(shown.items[Number(td.parentElement.dataset.i)], td.dataset.t);
+            if (shown) panel.querySelectorAll("#srchResults [data-t]").forEach(el => {
+                el.textContent = cellText(shown.items[Number(el.closest('tr').dataset.i)], el.dataset.t);
             });
             if (statusText) setStatus(statusText);
+            document.documentElement.dataset.lang = LANGS[L][0];
+            document.dispatchEvent(new Event("langchange"));
         }
         panel.querySelectorAll(".lang-sw").forEach(b => b.addEventListener("click", () => setLang(Number(b.dataset.lang))));
         let saved = 0;
@@ -717,7 +746,8 @@
     }
 
     const cellText = (it, key) => key === 'hit'
-        ? it.hit[lang] + (it.astarText !== undefined ? ` (routes ${it.astarText})` : '') : it[key][lang];
+        ? it.hit[lang] + (it.astarText !== undefined ? ' ' + fill('routes', it.astarText) : '')
+        : key === 'cost' ? fmt(it.cost) : it[key][lang];
     const textCell = (it, key, cls) => `<td class="${cls}" data-t="${key}">${cellText(it, key)}</td>`;
 
     let shown = null, routeRt = null, routeSeq = 0;
@@ -744,19 +774,19 @@
         if (!item) return;
         const row = document.createElement('tr');
         row.className = 'srch-route';
-        row.innerHTML = `<td colspan="${tr.children.length}" class="srch-left">Route: working…</td>`;
+        row.innerHTML = `<td colspan="${tr.children.length}" class="srch-left"><span${wordAttr('routeWorking')}>${word('routeWorking')}</span></td>`;
         tr.after(row);
         const cell = row.firstElementChild, seedHex = tr.dataset.seed;
         requestRoute(shown.job, item).then(route => {
-            if (!route) { cell.textContent = 'Route: not found.'; return; }
-            cell.innerHTML = 'Route: ' + route.visits.map(v => {
+            if (!route) { cell.innerHTML = `<span${wordAttr('routeNone')}>${word('routeNone')}</span>`; return; }
+            cell.innerHTML = `<span${wordAttr('route')}>${word('route')}</span> ` + route.visits.map(v => {
                 const stops = [v.legs[0][0]].concat(v.legs.map(l => l[1])).map(stopName).join('→');
                 return `<span class="srch-stop" data-seed="${seedHex}" data-floor="${v.f + 1}" data-legs='${JSON.stringify(v.legs)}'>` +
                        `B${v.f + 1}F ${stops} ${v.cost.toFixed(2)}</span>`;
             }).join(' ') + ` <span class="srch-note">= ${route.cost.toFixed(3)}</span>`;
             const stopsEls = cell.querySelectorAll('.srch-stop');
             if (stopsEls.length) showStop(stopsEls[stopsEls.length - 1]);
-        }).catch(err => { cell.textContent = 'Route error: ' + err.message; });
+        }).catch(err => { cell.innerHTML = `<span${wordAttr('routeError')}>${word('routeError')}</span> `; cell.append(err.message); });
     }
     function showStop(el) {
         document.querySelectorAll('.srch-stop.on').forEach(s => s.classList.remove('on'));
@@ -767,28 +797,28 @@
     }
 
     const hex4 = s => s.toString(16).toUpperCase().padStart(4, '0');
-    const fmt = c => c === Infinity ? 'unreachable' : c.toFixed(3);
+    const fmt = c => c === Infinity ? word('unreachable') : c.toFixed(3);
 
     function renderFastestResults(items) {
-        const head = `<tr><th>#</th><th>Seed</th><th>Rank</th><th class="srch-left"${wordAttr('C01')}>${word('C01')}</th><th class="srch-left"${wordAttr('C02')}>${word('C02')}</th><th class="srch-left">Boss</th><th>F</th><th>Steps</th></tr>`;
+        const head = `<tr><th>#</th><th>Seed</th><th>Rank</th><th class="srch-left"${wordAttr('C01')}>${word('C01')}</th><th class="srch-left"${wordAttr('C02')}>${word('C02')}</th><th class="srch-left">Boss</th><th${wordAttr('C04')}>${word('C04')}</th><th${wordAttr('steps')}>${word('steps')}</th></tr>`;
         const rows = items.map((it, i) => {
             const per = it.per.map((c, f) => `B${f + 1}F ${c.toFixed(2)}`).join(' / ');
-            return `<tr class="srch-pick" data-i="${i}" data-seed="${hex4(it.seed)}" title="Show the route">` +
+            return `<tr class="srch-pick" data-i="${i}" data-seed="${hex4(it.seed)}" title="${word('showRoute')}">` +
                    `<td>${i + 1}</td><td>${hex4(it.seed)}</td><td>${it.rStr}</td>${textCell(it, 'name', 'srch-left')}` +
                    `${textCell(it, 'type', 'srch-left')}${textCell(it, 'boss', 'srch-left')}<td>${it.fc}</td>` +
-                   `<td><b>${fmt(it.cost)}</b><span class="tip" tabindex="0" data-tip="${per}">ⓘ</span></td></tr>`;
+                   `<td><b data-t="cost">${cellText(it, 'cost')}</b><span class="tip" tabindex="0" data-tip="${per}">ⓘ</span></td></tr>`;
         }).join("");
         document.getElementById("srchResults").innerHTML = items.length ? head + rows : "";
     }
 
     function renderItemResults(items) {
-        const head = `<tr><th>#</th><th>Seed</th><th>Rank</th><th class="srch-left"${wordAttr('C01')}>${word('C01')}</th><th>F</th><th>Steps</th><th class="srch-left">Hit</th></tr>`;
+        const head = `<tr><th>#</th><th>Seed</th><th>Rank</th><th class="srch-left"${wordAttr('C01')}>${word('C01')}</th><th${wordAttr('C04')}>${word('C04')}</th><th${wordAttr('steps')}>${word('steps')}</th><th class="srch-left"${wordAttr('hit')}>${word('hit')}</th></tr>`;
         let n = 0;
         const rows = items.map((it, i) => {
             if (it.header) return `<tr><td colspan="7" class="srch-left"><b>${it.header}</b></td></tr>`;
-            return `<tr class="srch-pick" data-i="${i}" data-seed="${hex4(it.seed)}" title="Show the route">` +
+            return `<tr class="srch-pick" data-i="${i}" data-seed="${hex4(it.seed)}" title="${word('showRoute')}">` +
                    `<td>${++n}</td><td>${hex4(it.seed)}</td><td>${it.rStr}</td>${textCell(it, 'name', 'srch-left')}<td>${it.fc}</td>` +
-                   `<td><b>${fmt(it.cost)}</b></td>${textCell(it, 'hit', 'srch-floors')}</tr>`;
+                   `<td><b data-t="cost">${cellText(it, 'cost')}</b></td>${textCell(it, 'hit', 'srch-floors')}</tr>`;
         }).join("");
         document.getElementById("srchResults").innerHTML = items.length ? head + rows : "";
     }

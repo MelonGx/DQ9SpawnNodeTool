@@ -4,8 +4,11 @@
     const PX_PER_TILE = 64;
     const SVG_NS = "http://www.w3.org/2000/svg";
     const PATH_COLOR = "#ff00ff";
-    const S = walk.SIZES, px = v => `${+v.toFixed(2)}px`, part = v => `1/${S.corridor / v} of a corridor`;
-    const WALK_TIP = `Walls are the dark wall lines TKG draws; a corridor is ${px(S.corridor)} wide. ` +
+    const W = (en, ja) => document.documentElement.dataset.lang === 'ja' ? ja : en;
+    const S = walk.SIZES, px = v => `${+v.toFixed(2)}px`;
+    const part = v => W(`1/${S.corridor / v} of a corridor`, `通路幅の 1/${S.corridor / v}`);
+    const walkTip = () => W(
+        `Walls are the dark wall lines TKG draws; a corridor is ${px(S.corridor)} wide. ` +
         `The character (${px(S.char)} × ${px(S.char)}, ${part(S.char)}) moves ${px(S.step)} at a time, horizontally, vertically or at 45°; ` +
         `its whole body stays on the floor and never touches a wall line, walking straight or at 45°, so it never cuts a wall. ` +
         `The up stairs (${px(S.upWidth)} wide, ${px(S.upDepth)} deep, right behind its point) and the down stairs ` +
@@ -15,7 +18,18 @@
         `A walk to a chest ends touching one of its sides (never only a corner); a walk from a chest leaves from such a spot. ` +
         `A walk to the down stairs ends as soon as the character steps onto it, from any direction. ` +
         `Unit = one tile edge; 1 diagonal step = one tile edge on both x and y. ` +
-        `From / To or a table cell picks the pair to draw; None or a – cell hides it. A search route stays until a single pair is picked.`;
+        `From / To or a table cell picks the pair to draw; None or a – cell hides it. A search route stays until a single pair is picked.`,
+        `壁は TKG が描く暗い壁線で、通路の幅は ${px(S.corridor)}。` +
+        `キャラクター（${px(S.char)} × ${px(S.char)}、${part(S.char)}）は 1 回に ${px(S.step)} ずつ、縦・横・45° に動きます。` +
+        `直進でも 45° でも体全体が床の上にあって壁線に触れないので、壁を斜めに抜けることはありません。` +
+        `上り階段（幅 ${px(S.upWidth)}、奥行 ${px(S.upDepth)}、座標のすぐ後ろ）と下り階段` +
+        `（${px(S.down)} の正方形、${part(S.down)}、座標が中心）は壁です。` +
+        `上り階段からの歩行は、宝箱の上でもキャラクターが階段のすぐ前に立った状態から始まります。動き出したら、` +
+        `宝箱（${px(S.chest)} × ${px(S.chest)}、座標が中心）はすべて壁で、出ることはできても入ることはできません。` +
+        `宝箱への歩行は宝箱の辺に接した時点で終わり（角だけの接触は不可）、宝箱からの歩行もそのような位置から出発します。` +
+        `下り階段への歩行は、どの方向からでも階段に踏み込んだ時点で終わります。` +
+        `単位＝マスの 1 辺。斜め 1 歩＝x・y ともマスの 1 辺。` +
+        `始点 / 終点 か表のセルで描くペアを選び、なし か – のセルで非表示。検索のルートは、ペアを 1 つ選ぶまで表示されたままです。`);
 
     let state = null;
     let sel = { from: 'up', to: 'down' };
@@ -60,8 +74,8 @@
         return Infinity;
     }
 
-    const META = [['up', 'U', 'Up Stairs', '#00ff00'], ['down', 'D', 'Down Stairs', '#ff4040']];
-    const metaOf = k => k < 2 ? META[k] : ['c' + (k - 2), String(k - 1), 'Chest ' + (k - 1), '#ffff00'];
+    const META = [['up', 'U', ['Up Stairs', '上り階段'], '#00ff00'], ['down', 'D', ['Down Stairs', '下り階段'], '#ff4040']];
+    const metaOf = k => k < 2 ? META[k] : ['c' + (k - 2), String(k - 1), ['Chest ' + (k - 1), '宝箱 ' + (k - 1)], '#ffff00'];
 
     function recompute() {
         if (!mapContext) { state = null; return; }
@@ -110,7 +124,7 @@
     }
     const splitText = len => {
         const [a, b] = len < Infinity ? split(len) : [0, 0];
-        return `straight ${a.toFixed(3)} + diagonal ${b.toFixed(3)} steps`;
+        return W(`straight ${a.toFixed(3)} + diagonal ${b.toFixed(3)} steps`, `直進 ${a.toFixed(3)} + 斜め ${b.toFixed(3)} 歩`);
     };
 
     function drawPath(walks) {
@@ -142,7 +156,7 @@
         return route && m && m.mapseed === route.seed && Number(m.floor) === route.floor ? route : null;
     }
 
-    const fmt = (v, digits) => v === Infinity ? 'unreachable' : v.toFixed(digits);
+    const fmt = (v, digits) => v === Infinity ? W('unreachable', '到達不可') : v.toFixed(digits);
 
     function render() {
         const fromSel = document.getElementById("distFrom");
@@ -153,7 +167,7 @@
 
         if (!state || state.points.length < 2) {
             fromSel.innerHTML = toSel.innerHTML = table.innerHTML = posTable.innerHTML = "";
-            result.textContent = "Nothing to measure on this floor.";
+            result.textContent = W("Nothing to measure on this floor.", "このフロアには測る対象がありません。");
             drawPath([]);
             return;
         }
@@ -163,7 +177,7 @@
         if (sel.from && !keys.includes(sel.from)) sel.from = 'up';
         if (sel.to && !keys.includes(sel.to)) sel.to = 'down';
 
-        const options = `<option value="">None</option>` + pts.map(p => `<option value="${p.key}">${p.label} ${p.name}</option>`).join("");
+        const options = `<option value="">${W('None', 'なし')}</option>` + pts.map(p => `<option value="${p.key}">${p.label} ${W(...p.name)}</option>`).join("");
         fromSel.innerHTML = toSel.innerHTML = options;
         fromSel.value = sel.from;
         toSel.value = sel.to;
@@ -173,25 +187,26 @@
         if (!id) {
             result.innerHTML = '';
         } else if (d === Infinity) {
-            result.innerHTML = `Distance: <b>unreachable</b>`;
+            result.innerHTML = `${W('Distance: ', '距離：')}<b>${fmt(d, 3)}</b>`;
         } else {
             result.innerHTML =
-                `<div>Distance: <b>${fmt(d, 3)}</b> tiles = ${splitText(d)} × √2</div>` +
-                `<div class="dist-muted">A* (tile centres, no corner cutting): ${fmt(state.dq9at[id], 1)} <span class="tip" tabindex="0" data-tip="Tile centres, diagonal 1.5, no corner cutting. Only the tile edge is shared 1:1 with the ideal walk; shown for reference only.">ⓘ</span></div>`;
+                `<div>${W('Distance: ', '距離：')}<b>${fmt(d, 3)}</b> ${W('tiles', 'マス')} = ${splitText(d)} × √2</div>` +
+                `<div class="dist-muted">${W('A* (tile centres, no corner cutting): ', 'A*（マス中心、角抜けなし）：')}${fmt(state.dq9at[id], 1)} <span class="tip" tabindex="0" data-tip="${W('Tile centres, diagonal 1.5, no corner cutting. Only the tile edge is shared 1:1 with the ideal walk; shown for reference only.', 'マス中心、斜め 1.5、角抜けなし。理想歩行と 1:1 で共通なのはマスの辺だけで、参考として表示しています。')}">ⓘ</span></div>`;
         }
 
         const posRows = pts.map(p => {
             const inX = p.x / TILE - p.tx, inY = 1 - (p.y / TILE - p.ty);
-            return `<tr><th style="color:${p.color}">${p.label}</th><td class="dist-name">${p.name}</td>` +
+            return `<tr><th style="color:${p.color}">${p.label}</th><td class="dist-name">${W(...p.name)}</td>` +
                    `<td>(${p.tx}, ${p.ty})</td><td>${inX.toFixed(3)}</td><td>${inY.toFixed(3)}</td></tr>`;
         }).join("");
-        posTable.innerHTML = `<tr><th><span class="tip" tabindex="0" data-tip="In-tile position: bottom-left (0, 0), centre (0.5, 0.5)">ⓘ</span></th><th>Name</th><th>Tile</th><th>In-tile X</th><th>In-tile Y</th></tr>${posRows}`;
+        posTable.innerHTML = `<tr><th><span class="tip" tabindex="0" data-tip="${W('In-tile position: bottom-left (0, 0), centre (0.5, 0.5)', 'マス内の位置：左下 (0, 0)、中心 (0.5, 0.5)')}">ⓘ</span></th>` +
+            `<th>${W('Name', '名前')}</th><th>${W('Tile', 'マス')}</th><th>${W('In-tile X', 'マス内 X')}</th><th>${W('In-tile Y', 'マス内 Y')}</th></tr>${posRows}`;
 
         const head = pts.map(p => `<th style="color:${p.color}">${p.label}</th>`).join("");
         const rows = pts.map(a => {
             const cells = pts.map(b => {
                 const cid = a.key + '>' + b.key;
-                if (a.key === b.key) return `<td class="pick dist-self" data-from="" data-to="" title="No route">–</td>`;
+                if (a.key === b.key) return `<td class="pick dist-self" data-from="" data-to="" title="${W('No route', 'ルートなし')}">–</td>`;
                 const cls = cid === id ? 'pick sel' : 'pick';
                 const tip = `${splitText(state.dist[cid])} | A*: ${fmt(state.dq9at[cid], 1)}`;
                 return `<td class="${cls}" data-from="${a.key}" data-to="${b.key}" title="${tip}">${fmt(state.dist[cid], 2)}</td>`;
@@ -205,11 +220,18 @@
             const name = k => (pts.find(p => p.key === k) || { label: '?' }).label;
             const c = r.legs.reduce((s, [f, t]) => s + state.dist[f + '>' + t], 0);
             const stops = [r.legs[0][0]].concat(r.legs.map(l => l[1])).map(name).join(' → ');
-            result.innerHTML = `<div>Search route: <b>${stops}</b> = <b>${fmt(c, 3)}</b> tiles = ${splitText(c)} × √2</div>`;
+            result.innerHTML = `<div>${W('Search route: ', '検索ルート：')}<b>${stops}</b> = <b>${fmt(c, 3)}</b> ${W('tiles', 'マス')} = ${splitText(c)} × √2</div>`;
             drawPath(r.legs.map(([f, t]) => state.path(f + '>' + t)));
         } else {
             drawPath(id ? [state.path(id)] : []);
         }
+    }
+
+    function relabel() {
+        document.getElementById("distTitle").textContent = W('Ideal Walk', '理想歩行');
+        document.getElementById("distTip").dataset.tip = walkTip();
+        document.querySelector('label[for="distFrom"]').textContent = W('From', '始点');
+        document.querySelector('label[for="distTo"]').textContent = W('To', '終点');
     }
 
     function buildPanel() {
@@ -234,11 +256,11 @@
         panel.className = "panel dist-panel";
         panel.innerHTML = `
             <div class="dist-row">
-                <b>Ideal Walk</b><span class="tip" tabindex="0" data-tip="${WALK_TIP}">ⓘ</span>
+                <b id="distTitle"></b><span class="tip" tabindex="0" id="distTip">ⓘ</span>
             </div>
             <div class="dist-row">
-                <label for="distFrom">From</label><select id="distFrom"></select>
-                <label for="distTo">To</label><select id="distTo"></select>
+                <label for="distFrom"></label><select id="distFrom"></select>
+                <label for="distTo"></label><select id="distTo"></select>
             </div>
             <div id="distResult"></div>
             <div class="dist-row dist-tables">
@@ -247,6 +269,8 @@
             </div>
         `;
         document.querySelector(".panel").after(panel);
+        relabel();
+        document.addEventListener("langchange", () => { relabel(); render(); });
 
         document.getElementById("distFrom").addEventListener("change", e => { sel.from = e.target.value; route = null; render(); });
         document.getElementById("distTo").addEventListener("change", e => { sel.to = e.target.value; route = null; render(); });
