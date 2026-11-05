@@ -131,6 +131,14 @@
     document.addEventListener("mouseout", e => { const t = tipOf(e); if (t && document.activeElement !== t) hideTip(); });
     document.addEventListener("focusin", e => { const t = tipOf(e); if (t) showTip(t); });
     document.addEventListener("focusout", e => { if (tipOf(e)) hideTip(); });
+    const dismissTip = () => {
+        hideTip();
+        const a = document.activeElement;
+        if (a && a.classList && a.classList.contains("tip")) a.blur();
+    };
+    document.addEventListener("scroll", dismissTip, { capture: true, passive: true });
+    window.addEventListener("resize", dismissTip);
+    document.addEventListener("pointerdown", e => { if (!tipOf(e)) dismissTip(); });
 
     scaleRenderedOutput();
 })();
