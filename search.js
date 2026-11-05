@@ -12,7 +12,6 @@
         og4: ['Silver platter', 'Glombolero', 'Brouhaha boomstick', "Hela's hammer", 'Depressing shoes', 'Unhappy hat', 'Divine dress'],
         og5: ['Cannibox', 'Mimic', "Pandora's box"],
     };
-    const LANGS = [['en', 'English'], ['ja', '日本語']], LANG_KEY = 'DQ9SpawnNodeTool.lang';
     const TEXT = {
         A03: ['Sorry! Quickload search is not available for chest monsters.', '宝箱モンスターは体感検索のみ対応しています。'],
         A05: ['Sorry! Searching for this item is currently unavailable.', 'このアイテムの検索機能は現在未実装です。'],
@@ -74,8 +73,7 @@
         routes: ['(routes {0})', '（ルート {0}）'],
         unreachable: ['unreachable', '到達不可'],
     };
-    let lang = 0;
-    const word = k => TEXT[k] ? TEXT[k][lang] : k;
+    const word = k => TEXT[k] ? TEXT[k][DQ9Lang.index()] : k;
     const fill = (k, ...a) => word(k).replace(/\{(\d)\}/g, (_, i) => a[i]);
     const wordAttr = k => TEXT[k] ? ` data-text="${k}"` : '';
     const tipAttr = (...keys) => ` data-tip-text="${keys.join(' ')}" data-tip="${keys.map(word).join('')}"`;
@@ -582,12 +580,11 @@
             .srch-panel .srch-row > span { display: inline-flex; gap: 6px; align-items: center; }
             .srch-panel select, .srch-panel button { background: #1e1e1e; border: 1px solid #555; color: #fff; padding: 6px 8px; font-family: monospace; font-size: 16px; max-width: 100%; }
             .srch-panel button { cursor: pointer; }
-            .srch-panel .srch-title { align-self: stretch; }
-            .srch-panel .srch-row > span.lang-row { margin-left: auto; gap: 4px; }
             .srch-panel .srch-row > span.srch-btns { display: contents; }
-            .srch-panel .lang-sw { background: #224; color: #888; border-color: #444; border-radius: 4px; font-weight: bold; transition: all .15s; }
-            .srch-panel .lang-sw:hover { border-color: #00A2E8; color: #ccc; }
-            .srch-panel .lang-sw[aria-pressed=true] { background: #00A2E8; color: #fff; border-color: #00A2E8; }
+            .srch-panel button.srch-run { display: inline-grid; justify-items: center; }
+            .srch-panel button.srch-run > span { grid-area: 1 / 1; }
+            .srch-panel button.srch-run > span + span, .srch-panel button.srch-run.running > span:first-child { visibility: hidden; }
+            .srch-panel button.srch-run.running > span + span { visibility: visible; }
             .srch-panel input.srch-hex { width: 70px; text-transform: uppercase; }
             .srch-panel .srch-note { color: #999; }
             .srch-panel .srch-head { color: #fff; font-weight: bold; }
@@ -619,7 +616,7 @@
         const label = (k, id) => `<label for="${id}"${wordAttr(k)}>${word(k)}</label>`;
         const field = (k, id, html) => `<span>${label(k, id)}${html}</span>`;
         const cell = (k, id, html) => `<div class="srch-cell">${label(k, id)}${html}</div>`;
-        const button = (id, k) => `<button id="${id}" data-label="${k}">${word(k)}</button>`;
+        const button = (id, k) => `<button id="${id}" class="srch-run"><span${wordAttr(k)}>${word(k)}</span><span>STOP</span></button>`;
         const num = (id, min, max) => `<input type="number" id="${id}" min="${min}" max="${max}">`;
 
         const onlyMon = [], seen = new Set(['0B5', '01B', '0B9']);
@@ -636,8 +633,7 @@
         const panel = document.createElement("div");
         panel.className = "panel srch-panel";
         panel.innerHTML = `
-            <div class="srch-row srch-title"><b${wordAttr('title')}>${word('title')}</b><span class="tip" tabindex="0"${tipAttr('titleTip')}>ⓘ</span>
-                <span class="lang-row">${LANGS.map(([, name], L) => `<button type="button" class="lang-sw" data-lang="${L}">${name}</button>`).join('')}</span></div>
+            <div class="srch-row"><b${wordAttr('title')}>${word('title')}</b><span class="tip" tabindex="0"${tipAttr('titleTip')}>ⓘ</span></div>
             <div class="srch-row">
                 <span><input type="checkbox" id="srchAllRanks" checked>${label('F01', 'srchAllRanks')}</span>
                 ${field('Rank', 'srchRank', `<select id="srchRank">${opts(rankOpts)}</select>`)}
@@ -692,7 +688,7 @@
                 const job = makeJob();
                 if (!job) return;
                 document.getElementById("srchResults").innerHTML = "";
-                btn.textContent = "STOP";
+                btn.classList.add("running");
                 const t0 = Date.now();
                 running = (job.kind === 'fastest' && job.topN < Infinity ? runFastestMap : runJob)(job,
                     (p, total) => setStatus(() => p.text ? p.text() : `${Math.floor(p.processed / total * 100)}% — ${p.hits} ${word('B03')}`));
@@ -705,7 +701,7 @@
                     shown = { job, items };
                     if (job.kind === 'item') renderItemResults(items); else renderFastestResults(items);
                 }).catch(err => setStatus(() => fill('error', err.message)))
-                  .finally(() => { running = null; btn.textContent = word(btn.dataset.label); });
+                  .finally(() => { running = null; btn.classList.remove("running"); });
             });
         };
         bind("srchGo", fastestJob);
@@ -713,26 +709,18 @@
         bind("srchCombo", comboJob);
         bind("srch3rd", thirdJob);
 
-        function setLang(L) {
-            lang = L;
-            try { localStorage.setItem(LANG_KEY, String(L)); } catch (e) {}
-            panel.querySelectorAll(".lang-sw").forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.lang) === L)));
+        function relabel() {
             panel.querySelectorAll("[data-text]").forEach(el => { el.textContent = word(el.dataset.text); });
-            panel.querySelectorAll("button[data-label]").forEach(b => { if (!running || running.btn !== b) b.textContent = word(b.dataset.label); });
             panel.querySelectorAll("[data-tip-text]").forEach(el => { el.dataset.tip = el.dataset.tipText.split(' ').map(word).join(''); });
             panel.querySelectorAll("#srchResults tr.srch-pick").forEach(tr => { tr.title = word('showRoute'); });
-            panel.querySelectorAll("#srchItem option").forEach(o => { o.textContent = C.itemName(o.value, L); });
+            panel.querySelectorAll("#srchItem option").forEach(o => { o.textContent = C.itemName(o.value, DQ9Lang.index()); });
             if (shown) panel.querySelectorAll("#srchResults [data-t]").forEach(el => {
                 el.textContent = cellText(shown.items[Number(el.closest('tr').dataset.i)], el.dataset.t);
             });
             if (statusText) setStatus(statusText);
-            document.documentElement.dataset.lang = LANGS[L][0];
-            document.dispatchEvent(new Event("langchange"));
         }
-        panel.querySelectorAll(".lang-sw").forEach(b => b.addEventListener("click", () => setLang(Number(b.dataset.lang))));
-        let saved = 0;
-        try { saved = Number(localStorage.getItem(LANG_KEY)) || 0; } catch (e) {}
-        setLang(LANGS[saved] ? saved : 0);
+        relabel();
+        document.addEventListener("langchange", relabel);
 
         document.getElementById("srchResults").addEventListener("click", e => {
             if (e.target.closest(".tip")) return;
@@ -744,8 +732,8 @@
     }
 
     const cellText = (it, key) => key === 'hit'
-        ? it.hit[lang] + (it.astarText !== undefined ? ' ' + fill('routes', it.astarText) : '')
-        : key === 'cost' ? fmt(it.cost) : it[key][lang];
+        ? it.hit[DQ9Lang.index()] + (it.astarText !== undefined ? ' ' + fill('routes', it.astarText) : '')
+        : key === 'cost' ? fmt(it.cost) : it[key][DQ9Lang.index()];
     const textCell = (it, key, cls) => `<td class="${cls}" data-t="${key}">${cellText(it, key)}</td>`;
 
     let shown = null, routeRt = null, routeSeq = 0;

@@ -4,7 +4,7 @@
     const PX_PER_TILE = 64;
     const SVG_NS = "http://www.w3.org/2000/svg";
     const PATH_COLOR = "#ff00ff";
-    const W = (en, ja) => document.documentElement.dataset.lang === 'ja' ? ja : en;
+    const W = DQ9Lang.pick;
     const walkTip = () => W("Shortest walks between this floor's stairs and chests, drawn on the map. Credit: TKG (floors).",
         'このフロアの階段と宝箱の間の最短の歩き方をマップに描きます。クレジット：TKG（フロア）');
 

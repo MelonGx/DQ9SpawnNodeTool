@@ -17,7 +17,7 @@
         .app.stacked .app-side { width: 100%; }
         .map-pin { display: none; }
         .app.stacked .map-pin { display: block; margin: 4px auto 0; background: #2d2d2d; border: 1px solid #555; color: #d4d4d4;
-                                font-family: monospace; font-size: 16px; padding: 4px 12px; border-radius: 4px; }
+                                font-family: monospace; font-size: 16px; line-height: 1.4; padding: 4px 12px; border-radius: 4px; }
         html { -webkit-text-size-adjust: 100%; }
         #overlapCanvas { display: none; }
         .tip { position: relative; display: inline-block; margin-left: 4px; color: #888; cursor: help; font-weight: normal; }
@@ -68,8 +68,7 @@
     pin.className = "map-pin";
     pin.type = "button";
     const pinText = () => {
-        const ja = document.documentElement.dataset.lang === 'ja', off = mapCol.classList.contains("unpinned");
-        pin.textContent = off ? (ja ? "マップを固定" : "Pin Map") : (ja ? "マップの固定を解除" : "Unpin Map");
+        pin.textContent = mapCol.classList.contains("unpinned") ? DQ9Lang.pick("Pin Map", "マップを固定") : DQ9Lang.pick("Unpin Map", "マップの固定を解除");
     };
     pinText();
     pin.addEventListener("click", () => { mapCol.classList.toggle("unpinned"); pinText(); });
@@ -80,7 +79,7 @@
     probe.style.cssText = "position:fixed;left:0;top:0;width:0;height:100vh;height:100svh;visibility:hidden;pointer-events:none";
     document.body.append(probe);
     const viewH = () => probe.getBoundingClientRect().height || window.innerHeight;
-    document.querySelectorAll("body > .panel").forEach(p => side.append(p));
+    document.querySelectorAll("body > .lang-row, body > .panel").forEach(p => side.append(p));
 
     const results = document.getElementById("srchResults");
     if (results) {
