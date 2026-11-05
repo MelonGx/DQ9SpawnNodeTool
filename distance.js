@@ -205,7 +205,7 @@
     }
 
     function relabel() {
-        document.getElementById("distTitle").textContent = W('Ideal Walk', '理想歩数');
+        document.getElementById("distTitle").textContent = W('Ideal Walk', '実距離');
         document.getElementById("distTip").dataset.tip = walkTip();
         document.querySelector('label[for="distFrom"]').textContent = W('From', 'スタート');
         document.querySelector('label[for="distTo"]').textContent = W('To', 'ゴール');
