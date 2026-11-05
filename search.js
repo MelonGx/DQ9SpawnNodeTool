@@ -53,24 +53,25 @@
         C04: ['F', '深さ'],
         title: ['Ideal Walk Search', '理想歩数検索'],
         titleTip: ["Finds maps with DQ9AT's searches and ranks them by the ideal walk. Credit: DQ9AT (searches), TKG (floors).",
-                   'DQ9AT の検索で地図を探し、理想歩数で順位を付けます。クレジット：DQ9AT（検索）、TKG（フロア）'],
+                   'DQ9AT の検索で条件に合う地図を探し、理想歩数の少ない順に並べます。出典：DQ9AT（検索）、TKG（フロア生成）'],
         searchTip: ['Finds the Fastest Map (top 50), or with Sp.Floor or ONLY Monster the Fastest Floor (all hits). Credit: DQ9AT; ElistOfs: dq9tmap101.exe, TKG.',
-                    '最短地図（上位 50 件）を探します。特殊フロアかオンリーM 指定時は最短フロア（全件）。クレジット：DQ9AT；ElistOfs：dq9tmap101.exe、TKG'],
-        ctTip: ['. All hits, ranked by the ideal walk. Credit: DQ9AT.', '。全件を理想歩数順に表示。クレジット：DQ9AT'],
+                    '最短地図（上位 50 件）を検索します。特殊フロアまたはオンリーM を指定すると、最短フロア（全件）を検索します。出典：DQ9AT（ElistOfs：dq9tmap101.exe、TKG）'],
+        ctTip: ['. All hits, ranked by the ideal walk. Credit: DQ9AT.', '。条件に合う地図をすべて、理想歩数の少ない順に表示します。出典：DQ9AT'],
+        progress: ['{0}% — {1}', '検索中… {0}%（{1}）'],
         done: ['Done: {0} ({1} s, {2})', '完了：{0}（{1} 秒、{2}）'],
-        workers: ['{0} workers', '{0} ワーカー'],
-        worker: ['{0} worker', '{0} ワーカー'],
+        workers: ['{0} workers', 'ワーカー数 {0}'],
+        worker: ['{0} worker', 'ワーカー数 {0}'],
         mainThread: ['main thread', 'メインスレッド'],
-        ranking: ['Ranking: {0} seeds walked, {1} of {2} maps checked', 'ランキング：Seed {0} 個を歩行済み、地図 {2} 個中 {1} 個を確認'],
+        ranking: ['Ranking: {0} seeds walked, {1} of {2} maps checked', '順位付け中… Seed {0} 個を計算済み、地図 {1} / {2} 件を確認済み'],
         error: ['Error: {0}', 'エラー：{0}'],
         steps: ['Steps', '歩数'],
-        hit: ['Hit', '該当'],
-        showRoute: ['Show the route', 'ルートを表示'],
-        route: ['Route:', 'ルート：'],
-        routeWorking: ['Route: working…', 'ルート：計算中…'],
-        routeNone: ['Route: not found.', 'ルート：見つかりません。'],
-        routeError: ['Route error:', 'ルートエラー：'],
-        routes: ['(routes {0})', '（ルート {0}）'],
+        hit: ['Hit', '該当内容'],
+        showRoute: ['Show the route', 'クリックでルートを表示'],
+        route: ['Route: ', 'ルート：'],
+        routeWorking: ['Route: working…', 'ルートを計算中…'],
+        routeNone: ['Route: not found.', 'ルートが見つかりませんでした。'],
+        routeError: ['Route error: ', 'ルート計算エラー：'],
+        routes: ['(routes {0})', '（ルート別：{0}）'],
         unreachable: ['unreachable', '到達不可'],
     };
     const word = k => TEXT[k] ? TEXT[k][DQ9Lang.index()] : k;
@@ -691,7 +692,7 @@
                 btn.classList.add("running");
                 const t0 = Date.now();
                 running = (job.kind === 'fastest' && job.topN < Infinity ? runFastestMap : runJob)(job,
-                    (p, total) => setStatus(() => p.text ? p.text() : `${Math.floor(p.processed / total * 100)}% — ${p.hits} ${word('B03')}`));
+                    (p, total) => setStatus(() => p.text ? p.text() : fill('progress', Math.floor(p.processed / total * 100), `${p.hits} ${word('B03')}`)));
                 running.btn = btn;
                 running.promise.then(res => {
                     const items = job.kind === 'item' ? shapeItems(res.items, job.preset) : res.items;
@@ -765,14 +766,14 @@
         const cell = row.firstElementChild, seedHex = tr.dataset.seed;
         requestRoute(shown.job, item).then(route => {
             if (!route) { cell.innerHTML = `<span${wordAttr('routeNone')}>${word('routeNone')}</span>`; return; }
-            cell.innerHTML = `<span${wordAttr('route')}>${word('route')}</span> ` + route.visits.map(v => {
+            cell.innerHTML = `<span${wordAttr('route')}>${word('route')}</span>` + route.visits.map(v => {
                 const stops = [v.legs[0][0]].concat(v.legs.map(l => l[1])).map(stopName).join('→');
                 return `<span class="srch-stop" data-seed="${seedHex}" data-floor="${v.f + 1}" data-legs='${JSON.stringify(v.legs)}'>` +
                        `B${v.f + 1}F ${stops} ${v.cost.toFixed(2)}</span>`;
             }).join(' ') + ` <span class="srch-note">= ${route.cost.toFixed(3)}</span>`;
             const stopsEls = cell.querySelectorAll('.srch-stop');
             if (stopsEls.length) showStop(stopsEls[stopsEls.length - 1]);
-        }).catch(err => { cell.innerHTML = `<span${wordAttr('routeError')}>${word('routeError')}</span> `; cell.append(err.message); });
+        }).catch(err => { cell.innerHTML = `<span${wordAttr('routeError')}>${word('routeError')}</span>`; cell.append(err.message); });
     }
     function showStop(el) {
         document.querySelectorAll('.srch-stop.on').forEach(s => s.classList.remove('on'));

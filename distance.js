@@ -6,7 +6,7 @@
     const PATH_COLOR = "#ff00ff";
     const W = DQ9Lang.pick;
     const walkTip = () => W("Shortest walks between this floor's stairs and chests, drawn on the map. Credit: TKG (floors).",
-        'このフロアの階段と宝箱の間の最短の歩き方をマップに描きます。クレジット：TKG（フロア）');
+        'このフロアの階段・宝箱どうしの最短ルートをマップ上に表示します。出典：TKG（フロア生成）');
 
     let state = null;
     let sel = { from: 'up', to: 'down' };
@@ -101,7 +101,7 @@
     }
     const splitText = len => {
         const [a, b] = len < Infinity ? split(len) : [0, 0];
-        return W(`straight ${a.toFixed(3)} + diagonal ${b.toFixed(3)} steps`, `直進 ${a.toFixed(3)} + 斜め ${b.toFixed(3)} 歩`);
+        return W(`straight ${a.toFixed(3)} + diagonal ${b.toFixed(3)} steps`, `直進 ${a.toFixed(3)} + 斜め ${b.toFixed(3)}`);
     };
 
     function drawPath(walks) {
@@ -144,7 +144,7 @@
 
         if (!state || state.points.length < 2) {
             fromSel.innerHTML = toSel.innerHTML = table.innerHTML = posTable.innerHTML = "";
-            result.textContent = W("Nothing to measure on this floor.", "このフロアには測る対象がありません。");
+            result.textContent = W("Nothing to measure on this floor.", "このフロアには測定できる地点がありません。");
             drawPath([]);
             return;
         }
@@ -168,7 +168,7 @@
         } else {
             result.innerHTML =
                 `<div>${W('Distance: ', '距離：')}<b>${fmt(d, 3)}</b> ${W('tiles', 'マス')} = ${splitText(d)} × √2</div>` +
-                `<div class="dist-muted">${W('A* (tile centres, no corner cutting): ', 'A*（マス中心、角抜けなし）：')}${fmt(state.dq9at[id], 1)} <span class="tip" tabindex="0" data-tip="${W("For comparing the ideal walk with DQ9AT's A* step count. Credit: DQ9AT.", '理想歩数と DQ9AT の A* 歩数の比較用。クレジット：DQ9AT')}">ⓘ</span></div>`;
+                `<div class="dist-muted">${W('A* (tile centres, no corner cutting): ', 'A*（マス中心・角抜けなし）：')}${fmt(state.dq9at[id], 1)} <span class="tip" tabindex="0" data-tip="${W("For comparing the ideal walk with DQ9AT's A* step count. Credit: DQ9AT.", 'DQ9AT の A* 歩数と比べるための参考値です。出典：DQ9AT')}">ⓘ</span></div>`;
         }
 
         const posRows = pts.map(p => {
@@ -176,8 +176,8 @@
             return `<tr><th style="color:${p.color}">${p.label}</th><td class="dist-name">${p.name ? W(...p.name) : ''}</td>` +
                    `<td>(${p.tx}, ${p.ty})</td><td>${inX.toFixed(3)}</td><td>${inY.toFixed(3)}</td></tr>`;
         }).join("");
-        posTable.innerHTML = `<tr><th><span class="tip" tabindex="0" data-tip="${W('Where each point sits in its tile (bottom-left = 0, 0). Credit: TKG (coordinates).', '各点がマスのどこにあるか（左下 = 0, 0）。クレジット：TKG（座標）')}">ⓘ</span></th>` +
-            `<th>${W('Name', '名前')}</th><th>${W('Tile', 'マス')}</th><th>${W('In-tile X', 'マス内 X')}</th><th>${W('In-tile Y', 'マス内 Y')}</th></tr>${posRows}`;
+        posTable.innerHTML = `<tr><th><span class="tip" tabindex="0" data-tip="${W('Where each point sits in its tile (bottom-left = 0, 0). Credit: TKG (coordinates).', '各地点のマス内での位置です（左下が (0, 0)）。出典：TKG（座標）')}">ⓘ</span></th>` +
+            `<th>${W('Name', '名前')}</th><th>${W('Tile', 'マス座標')}</th><th>${W('In-tile X', 'マス内 X')}</th><th>${W('In-tile Y', 'マス内 Y')}</th></tr>${posRows}`;
 
         const head = pts.map(p => `<th style="color:${p.color}">${p.label}</th>`).join("");
         const rows = pts.map(a => {
@@ -208,7 +208,7 @@
         document.getElementById("distTitle").textContent = W('Ideal Walk', '理想歩数');
         document.getElementById("distTip").dataset.tip = walkTip();
         document.querySelector('label[for="distFrom"]').textContent = W('From', 'スタート');
-        document.querySelector('label[for="distTo"]').textContent = W('To', '終点');
+        document.querySelector('label[for="distTo"]').textContent = W('To', 'ゴール');
     }
 
     function buildPanel() {
