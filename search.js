@@ -584,6 +584,7 @@
             .srch-panel button { cursor: pointer; }
             .srch-panel .srch-title { align-self: stretch; }
             .srch-panel .srch-row > span.lang-row { margin-left: auto; gap: 4px; }
+            .srch-panel .srch-row > span.srch-btns { display: contents; }
             .srch-panel .lang-sw { background: #224; color: #888; border-color: #444; border-radius: 4px; font-weight: bold; transition: all .15s; }
             .srch-panel .lang-sw:hover { border-color: #00A2E8; color: #ccc; }
             .srch-panel .lang-sw[aria-pressed=true] { background: #00A2E8; color: #fff; border-color: #00A2E8; }
@@ -668,9 +669,7 @@
             <div class="srch-row">
                 <select id="srchQlMode"><option value="D">D</option><option value="5D">5D</option><option value="9D">9D</option></select>
                 <select id="srchItem">${items}</select>
-                ${button('srchQL', 'H01')}
-                ${button('srchCombo', 'H02')}
-                ${button('srch3rd', 'H03')}
+                <span class="srch-btns">${button('srchQL', 'H01')}${button('srchCombo', 'H02')}${button('srch3rd', 'H03')}</span>
             </div>
             <div class="srch-note" id="srchStatus"></div>
             <table class="srch-table" id="srchResults"></table>

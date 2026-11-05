@@ -29,6 +29,7 @@
             body { padding: 8px; }
             .app-side > .panel { padding: 10px; }
             .srch-panel .srch-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .srch-panel .srch-row > span.srch-btns { display: flex; flex: 0 0 100%; gap: 8px 12px; }
             .srch-table th, .srch-table td { padding: 3px 5px; }
         }
         @media (pointer: fine) {
