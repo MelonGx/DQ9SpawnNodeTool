@@ -5,7 +5,7 @@
     const SVG_NS = "http://www.w3.org/2000/svg";
     const PATH_COLOR = "#ff00ff";
     const W = DQ9Lang.pick;
-    const unit = () => W('tiles', 'マス目');
+    const unit = () => W('tiles', 'マス');
     const walkTip = () => W("Shortest walks between this floor's stairs and chests, drawn on the map. Numbers are in tiles (one tile edge), as in DQ9AT. Credit: TKG (floors).",
         'このフロアの階段・宝箱どうしの最短ルートをマップ上に表示します。数値の単位は DQ9AT と同じマス目（1 マスの辺の長さ）です。出典：TKG（フロア生成）');
 
