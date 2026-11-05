@@ -1788,11 +1788,9 @@
 
         run();
     </script>
-    <script src="lang.js"></script>
-    <script src="ideal-walk.js"></script>
-    <script src="distance.js"></script>
-    <script src="dq9at-core.js"></script>
-    <script src="search.js"></script>
-    <script src="layout.js"></script>
+    <script>
+        for (const f of ['lang', 'ideal-walk', 'distance', 'dq9at-core', 'search', 'layout'])
+            document.write(`<script src="${f}.js?v=${Date.parse(document.lastModified)}"><\/script>`);
+    </script>
 </body>
 </html>
