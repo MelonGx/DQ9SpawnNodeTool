@@ -169,7 +169,7 @@
         } else {
             result.innerHTML =
                 `<div>${W('Distance: ', '距離：')}<b>${fmt(d, 3)}</b> ${unit()} = ${splitText(d)} × √2</div>` +
-                `<div class="dist-muted">${W('A* (tile centres, no corner cutting): ', 'A*（マス中心・角抜けなし）：')}${fmt(state.dq9at[id], 1)} <span class="tip" tabindex="0" data-tip="${W("For comparing the ideal walk with DQ9AT's A* step count. Credit: DQ9AT.", 'DQ9AT の A* 歩数と比べるための参考値です。出典：DQ9AT')}">ⓘ</span></div>`;
+                `<div class="dist-muted">${W('A* (tile centres, no corner cutting): ', 'A*（マス中心・角抜けなし）：')}${fmt(state.dq9at[id], 1)} <span class="tip" tabindex="0" data-tip="${W("For comparing the ideal walk with DQ9AT's A* step count. Credit: DQ9AT.", 'DQ9AT の A* のマス数と比べるための参考値です。出典：DQ9AT')}">ⓘ</span></div>`;
         }
 
         const posRows = pts.map(p => {
