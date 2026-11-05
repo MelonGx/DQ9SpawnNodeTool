@@ -51,7 +51,7 @@
         return Infinity;
     }
 
-    const META = [['up', 'U', ['Up Stairs', '上り階段'], '#00ff00'], ['down', 'D', ['Down Stairs', '下り階段'], '#ff4040']];
+    const META = [['up', 'U', null, '#00ff00'], ['down', 'D', null, '#ff4040']];
     const metaOf = k => k < 2 ? META[k] : ['c' + (k - 2), String(k - 1), ['Chest ' + (k - 1), '宝箱 ' + (k - 1)], '#ffff00'];
 
     function recompute() {
@@ -154,7 +154,7 @@
         if (sel.from && !keys.includes(sel.from)) sel.from = 'up';
         if (sel.to && !keys.includes(sel.to)) sel.to = 'down';
 
-        const options = `<option value="">${W('None', 'なし')}</option>` + pts.map(p => `<option value="${p.key}">${p.label} ${W(...p.name)}</option>`).join("");
+        const options = `<option value="">${W('None', 'なし')}</option>` + pts.map(p => `<option value="${p.key}">${p.label}${p.name ? ' ' + W(...p.name) : ''}</option>`).join("");
         fromSel.innerHTML = toSel.innerHTML = options;
         fromSel.value = sel.from;
         toSel.value = sel.to;
@@ -173,7 +173,7 @@
 
         const posRows = pts.map(p => {
             const inX = p.x / TILE - p.tx, inY = 1 - (p.y / TILE - p.ty);
-            return `<tr><th style="color:${p.color}">${p.label}</th><td class="dist-name">${W(...p.name)}</td>` +
+            return `<tr><th style="color:${p.color}">${p.label}</th><td class="dist-name">${p.name ? W(...p.name) : ''}</td>` +
                    `<td>(${p.tx}, ${p.ty})</td><td>${inX.toFixed(3)}</td><td>${inY.toFixed(3)}</td></tr>`;
         }).join("");
         posTable.innerHTML = `<tr><th><span class="tip" tabindex="0" data-tip="${W('Where each point sits in its tile (bottom-left = 0, 0). Credit: TKG (coordinates).', '各点がマスのどこにあるか（左下 = 0, 0）。クレジット：TKG（座標）')}">ⓘ</span></th>` +
