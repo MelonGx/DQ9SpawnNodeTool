@@ -5,8 +5,9 @@
     const SVG_NS = "http://www.w3.org/2000/svg";
     const PATH_COLOR = "#ff00ff";
     const W = DQ9Lang.pick;
-    const walkTip = () => W("Shortest walks between this floor's stairs and chests, drawn on the map. Credit: TKG (floors).",
-        'このフロアの階段・宝箱どうしの最短ルートをマップ上に表示します。出典：TKG（フロア生成）');
+    const unit = () => W('tiles', 'マス目');
+    const walkTip = () => W("Shortest walks between this floor's stairs and chests, drawn on the map. Numbers are in tiles (one tile edge), as in DQ9AT. Credit: TKG (floors).",
+        'このフロアの階段・宝箱どうしの最短ルートをマップ上に表示します。数値の単位は DQ9AT と同じマス目（1 マスの辺の長さ）です。出典：TKG（フロア生成）');
 
     let state = null;
     let sel = { from: 'up', to: 'down' };
@@ -167,7 +168,7 @@
             result.innerHTML = `${W('Distance: ', '距離：')}<b>${fmt(d, 3)}</b>`;
         } else {
             result.innerHTML =
-                `<div>${W('Distance: ', '距離：')}<b>${fmt(d, 3)}</b> ${W('tiles', 'マス')} = ${splitText(d)} × √2</div>` +
+                `<div>${W('Distance: ', '距離：')}<b>${fmt(d, 3)}</b> ${unit()} = ${splitText(d)} × √2</div>` +
                 `<div class="dist-muted">${W('A* (tile centres, no corner cutting): ', 'A*（マス中心・角抜けなし）：')}${fmt(state.dq9at[id], 1)} <span class="tip" tabindex="0" data-tip="${W("For comparing the ideal walk with DQ9AT's A* step count. Credit: DQ9AT.", 'DQ9AT の A* 歩数と比べるための参考値です。出典：DQ9AT')}">ⓘ</span></div>`;
         }
 
@@ -197,7 +198,7 @@
             const name = k => (pts.find(p => p.key === k) || { label: '?' }).label;
             const c = r.legs.reduce((s, [f, t]) => s + state.dist[f + '>' + t], 0);
             const stops = [r.legs[0][0]].concat(r.legs.map(l => l[1])).map(name).join(' → ');
-            result.innerHTML = `<div>${W('Search route: ', '検索ルート：')}<b>${stops}</b> = <b>${fmt(c, 3)}</b> ${W('tiles', 'マス')} = ${splitText(c)} × √2</div>`;
+            result.innerHTML = `<div>${W('Search route: ', '検索ルート：')}<b>${stops}</b> = <b>${fmt(c, 3)}</b> ${unit()} = ${splitText(c)} × √2</div>`;
             drawPath(r.legs.map(([f, t]) => state.path(f + '>' + t)));
         } else {
             drawPath(id ? [state.path(id)] : []);
