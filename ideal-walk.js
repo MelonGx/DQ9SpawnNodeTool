@@ -7,7 +7,6 @@ function createIdealWalk(px = 16, tkg) {
     const CORRIDOR = 6;
     const CHEST = 1;
     const CHAR = CORRIDOR / 4, DOWN_HALF = CORRIDOR / 3 / 2, CHEST_HALF = CHEST / 2, UP_WIDTH = CHAR, UP_DEPTH = 2 * CHAR;
-    const SIZES = { corridor: CORRIDOR, char: CHAR, down: 2 * DOWN_HALF, chest: 2 * CHEST_HALF, upWidth: UP_WIDTH, upDepth: UP_DEPTH, step: 1 / SUB };
     const toPx = v => v * PX / TILE, fromPx = v => v * TILE / PX;
     const FOOT = px > 1 ? CHAR * SUB : 1;
     const DIAG_EXTRA = Math.SQRT2 - 1;
@@ -577,7 +576,7 @@ function createIdealWalk(px = 16, tkg) {
         };
     }
 
-    return { TILE, GRID, SIZES, lbSlack, isOpenTile, setFloor, setFloorTiles, gridFrom, gridPath, shortest, floorModel };
+    return { TILE, GRID, lbSlack, isOpenTile, setFloor, setFloorTiles, gridFrom, gridPath, shortest, floorModel };
 }
 
 (function thinWhenUnreachable() {

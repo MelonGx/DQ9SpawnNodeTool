@@ -5,31 +5,8 @@
     const SVG_NS = "http://www.w3.org/2000/svg";
     const PATH_COLOR = "#ff00ff";
     const W = (en, ja) => document.documentElement.dataset.lang === 'ja' ? ja : en;
-    const S = walk.SIZES, px = v => `${+v.toFixed(2)}px`;
-    const part = v => W(`1/${S.corridor / v} of a corridor`, `通路幅の 1/${S.corridor / v}`);
-    const walkTip = () => W(
-        `Walls are the dark wall lines TKG draws; a corridor is ${px(S.corridor)} wide. ` +
-        `The character (${px(S.char)} × ${px(S.char)}, ${part(S.char)}) moves ${px(S.step)} at a time, horizontally, vertically or at 45°; ` +
-        `its whole body stays on the floor and never touches a wall line, walking straight or at 45°, so it never cuts a wall. ` +
-        `The up stairs (${px(S.upWidth)} wide, ${px(S.upDepth)} deep, right behind its point) and the down stairs ` +
-        `(a ${px(S.down)} square, ${part(S.down)}, centred on its point) are walls. ` +
-        `Walks from the up stairs start with the character right in front of it, even on a chest; once it moves, ` +
-        `every chest (${px(S.chest)} × ${px(S.chest)}, centred on its point) is a wall, which it can only leave, never enter. ` +
-        `A walk to a chest ends touching one of its sides (never only a corner); a walk from a chest leaves from such a spot. ` +
-        `A walk to the down stairs ends as soon as the character steps onto it, from any direction. ` +
-        `Unit = one tile edge; 1 diagonal step = one tile edge on both x and y. ` +
-        `From / To or a table cell picks the pair to draw; None or a – cell hides it. A search route stays until a single pair is picked.`,
-        `壁は TKG が描く暗い壁線で、通路の幅は ${px(S.corridor)}。` +
-        `キャラクター（${px(S.char)} × ${px(S.char)}、${part(S.char)}）は 1 回に ${px(S.step)} ずつ、縦・横・45° に動きます。` +
-        `直進でも 45° でも体全体が床の上にあって壁線に触れないので、壁を斜めに抜けることはありません。` +
-        `上り階段（幅 ${px(S.upWidth)}、奥行 ${px(S.upDepth)}、座標のすぐ後ろ）と下り階段` +
-        `（${px(S.down)} の正方形、${part(S.down)}、座標が中心）は壁です。` +
-        `上り階段からの歩行は、宝箱の上でもキャラクターが階段のすぐ前に立った状態から始まります。動き出したら、` +
-        `宝箱（${px(S.chest)} × ${px(S.chest)}、座標が中心）はすべて壁で、出ることはできても入ることはできません。` +
-        `宝箱への歩行は宝箱の辺に接した時点で終わり（角だけの接触は不可）、宝箱からの歩行もそのような位置から出発します。` +
-        `下り階段への歩行は、どの方向からでも階段に踏み込んだ時点で終わります。` +
-        `単位＝マスの 1 辺。斜め 1 歩＝x・y ともマスの 1 辺。` +
-        `スタート / 終点 か表のセルで描くペアを選び、なし か – のセルで非表示。検索のルートは、ペアを 1 つ選ぶまで表示されたままです。`);
+    const walkTip = () => W("Shortest walks between this floor's stairs and chests, drawn on the map. Credit: TKG (floors).",
+        'このフロアの階段と宝箱の間の最短の歩き方をマップに描きます。クレジット：TKG（フロア）');
 
     let state = null;
     let sel = { from: 'up', to: 'down' };
@@ -191,7 +168,7 @@
         } else {
             result.innerHTML =
                 `<div>${W('Distance: ', '距離：')}<b>${fmt(d, 3)}</b> ${W('tiles', 'マス')} = ${splitText(d)} × √2</div>` +
-                `<div class="dist-muted">${W('A* (tile centres, no corner cutting): ', 'A*（マス中心、角抜けなし）：')}${fmt(state.dq9at[id], 1)} <span class="tip" tabindex="0" data-tip="${W('Tile centres, diagonal 1.5, no corner cutting. Only the tile edge is shared 1:1 with the ideal walk; shown for reference only.', 'マス中心、斜め 1.5、角抜けなし。理想歩数と 1:1 で共通なのはマスの辺だけで、参考として表示しています。')}">ⓘ</span></div>`;
+                `<div class="dist-muted">${W('A* (tile centres, no corner cutting): ', 'A*（マス中心、角抜けなし）：')}${fmt(state.dq9at[id], 1)} <span class="tip" tabindex="0" data-tip="${W("For comparing the ideal walk with DQ9AT's A* step count. Credit: DQ9AT.", '理想歩数と DQ9AT の A* 歩数の比較用。クレジット：DQ9AT')}">ⓘ</span></div>`;
         }
 
         const posRows = pts.map(p => {
@@ -199,7 +176,7 @@
             return `<tr><th style="color:${p.color}">${p.label}</th><td class="dist-name">${W(...p.name)}</td>` +
                    `<td>(${p.tx}, ${p.ty})</td><td>${inX.toFixed(3)}</td><td>${inY.toFixed(3)}</td></tr>`;
         }).join("");
-        posTable.innerHTML = `<tr><th><span class="tip" tabindex="0" data-tip="${W('In-tile position: bottom-left (0, 0), centre (0.5, 0.5)', 'マス内の位置：左下 (0, 0)、中心 (0.5, 0.5)')}">ⓘ</span></th>` +
+        posTable.innerHTML = `<tr><th><span class="tip" tabindex="0" data-tip="${W('Where each point sits in its tile (bottom-left = 0, 0). Credit: TKG (coordinates).', '各点がマスのどこにあるか（左下 = 0, 0）。クレジット：TKG（座標）')}">ⓘ</span></th>` +
             `<th>${W('Name', '名前')}</th><th>${W('Tile', 'マス')}</th><th>${W('In-tile X', 'マス内 X')}</th><th>${W('In-tile Y', 'マス内 Y')}</th></tr>${posRows}`;
 
         const head = pts.map(p => `<th style="color:${p.color}">${p.label}</th>`).join("");
