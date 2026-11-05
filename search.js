@@ -64,7 +64,7 @@
         mainThread: ['main thread', 'メインスレッド'],
         ranking: ['Ranking: {0} seeds walked, {1} of {2} maps checked', '順位付け中… Seed {0} 個を計算済み、地図 {1} / {2} 件を確認済み'],
         error: ['Error: {0}', 'エラー：{0}'],
-        steps: ['Steps', '歩数'],
+        steps: ['Steps', 'マス'],
         hit: ['Hit', '該当内容'],
         showRoute: ['Show the route', 'クリックでルートを表示'],
         route: ['Route: ', 'ルート：'],
