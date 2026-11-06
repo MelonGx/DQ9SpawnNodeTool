@@ -1,5 +1,5 @@
 (function () {
-    const walk = createIdealWalk(16, { TILE_WALL, TILE_DIVIDER, tileMap });
+    const walk = createIdealWalk(16, tkgApi());
     const TILE = walk.TILE;
     const PX_PER_TILE = 64;
     const SVG_NS = "http://www.w3.org/2000/svg";
@@ -57,12 +57,7 @@
 
     function recompute() {
         if (!mapContext) { state = null; return; }
-        const f = mapContext.field_0, sc = mapContext.stairsCoords || {};
-        const model = walk.floorModel({
-            grid: mapGrid, width: mapWidth, height: mapHeight, bitfield: bitfieldGrid, env: envIndices[getEnvironment(f.mapseed)],
-            up: sc.up, down: sc.down, upTile: mapContext.upStairs, downTile: mapContext.downStairs,
-            chests: mapContext.chestCoords || [], chestTiles: f._chestCoords || [],
-        });
+        const model = walk.floorModel();
         walk.setFloor(model.info);
         const points = model.points.flatMap((p, k) => {
             if (!p) return [];
@@ -278,5 +273,5 @@
         document.getElementById('floor').dispatchEvent(new Event('input'));
     }
 
-    window.DQ9Distance = { showRoute };
+    window.DQ9Distance = { showRoute, fmt };
 })();

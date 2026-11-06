@@ -21,9 +21,9 @@ const CHEST_RANK={10:'S',9:'A',8:'B',7:'C',6:'D',5:'E',4:'F',3:'G',2:'H',1:'I'};
 const ENV_OPTS=[['Caves','洞窟'],['Ruins','遺跡'],['Ice','氷'],['Water','水'],['Fire','火山']];
 const ENV_NAMES=Object.fromEntries(ENV_OPTS.map((o,i)=>[i+1,o]));
 const BOSS_NAMES={
-1:['Equinox','馬','黒竜丸'],2:['Nemean','爪','ハヌマーン'],3:['Shogum','髭','スライムジェネラル'],4:['Trauminator','機','Sキラーマシン'],
-5:['Elusid','教','イデアラゴン'],6:['Sir Sanguinus','血','ブラッドナイト'],7:['Atlas','巨','アトラス'],8:['Hammibal','猪','怪力軍曹イボイノス'],
-9:['Fowleye','鳥','邪眼皇帝アウルート'],10:['Excalipurr','猫','魔剣神レパルド'],11:['Tyrannosaurus Wrecks','滅','破壊神フォロボス'],12:['Greygnarl','竜','グレイナル']
+1:['Equinox','黒竜丸'],2:['Nemean','ハヌマーン'],3:['Shogum','スライムジェネラル'],4:['Trauminator','Sキラーマシン'],
+5:['Elusid','イデアラゴン'],6:['Sir Sanguinus','ブラッドナイト'],7:['Atlas','アトラス'],8:['Hammibal','怪力軍曹イボイノス'],
+9:['Fowleye','邪眼皇帝アウルート'],10:['Excalipurr','魔剣神レパルド'],11:['Tyrannosaurus Wrecks','破壊神フォロボス'],12:['Greygnarl','グレイナル']
 };
 const PREFIX_NAMES={
 1:['Clay','はかなき'],2:['Rock','ちいさな'],3:['Granite','うす暗き'],4:['Basalt','ゆらめく'],
@@ -197,212 +197,63 @@ class TreasureMap {
   }
   chestItem(f, i, sec) {return this.chestItems(f, sec)[i];}
 
-  get bossName() {return BOSS_NAMES[this.boss] ? BOSS_NAMES[this.boss][0] : "Unknown";}
-  get bossNameJP() {return BOSS_NAMES[this.boss] ? BOSS_NAMES[this.boss][2] : "不明";}
-  get mapName() {
-    if (!this.floorCount) return "Unknown";
-    return `${PREFIX_NAMES[this.prefix][0]} ${LOCALE_NAMES[this.locale][0]} of ${SUFFIX_NAMES[this.suffix][0]} Lv.${this.lv}`;
+  bossName(L) {
+    if (BOSS_NAMES[this.boss]) return BOSS_NAMES[this.boss][L];
+    return L ? "不明" : "Unknown";
   }
-  get mapNameJP() {
+  mapName(L) {
     if (!this.floorCount) return "Unknown";
-    return `${PREFIX_NAMES[this.prefix][1]}${SUFFIX_NAMES[this.suffix][1]}の${LOCALE_NAMES[this.locale][1]}Lv${this.lv}`;
+    const p = PREFIX_NAMES[this.prefix][L], s = SUFFIX_NAMES[this.suffix][L], l = LOCALE_NAMES[this.locale][L];
+    if (L) return `${p}${s}の${l}Lv${this.lv}`;
+    return `${p} ${l} of ${s} Lv.${this.lv}`;
   }
 }
 
 const MONSTER_DB = {
-  "008":{en:"Lost Soul",jp:"さまようたましい",g:20},
-  "00B":{en:"Mushroom Mage",jp:"マージマタンゴ",g:16},
-  "00E":{en:"Purrestidigitator",jp:"ベンガルクーン",g:16},
-  "012":{en:"Sootheslime",jp:"ベホイムスライム",g:20},
-  "013":{en:"Cureslime",jp:"ベホマスライム",g:16},
-  "015":{en:"Robo-robin",jp:"アイアンクック",g:16},
-  "01B":{en:"Liquid Metal Slime",jp:"はぐれメタル",g:16},
-  "022":{en:"Dread Admiral",jp:"しびれあげは",g:16},
-  "026":{en:"Cannibox",jp:"ひとくいばこ",g:16},
-  "027":{en:"Mimic",jp:"ミミック",g:12},
-  "028":{en:"Pandora's Box",jp:"パンドラボックス",g:20},
-  "02A":{en:"Raving Lunatick",jp:"メーダロード",g:16},
-  "02C":{en:"Goodybag",jp:"おどるほうせき",g:16},
-  "02E":{en:"Hell Niño",jp:"ヒートギズモ",g:16},
-  "02F":{en:"Freezing Fog",jp:"フロストギズモ",g:16},
-  "031":{en:"Grim Grinner",jp:"ダークホビット",g:16},
-  "034":{en:"Sluggernaut",jp:"スーパーテンツク",g:20},
-  "035":{en:"Sluggerslaught",jp:"ラストテンツク",g:16},
-  "036":{en:"Pink Sanguini",jp:"ピンクモーモン",g:16},
-  "037":{en:"Genie Sanguini",jp:"マポレーナ",g:12},
-  "03B":{en:"Scourgette",jp:"ブラックベジター",g:20},
-  "03D":{en:"Salamarauder",jp:"かいぞくウーパー",g:20},
-  "03E":{en:"Axolhotl",jp:"ウパパロン",g:12},
-  "040":{en:"Bagma",jp:"ようがんピロー",g:16},
-  "04C":{en:"Metal Medley",jp:"メタルブラザーズ",g:20},
-  "04D":{en:"Gem Jamboree",jp:"ゴールデントーテム",g:20},
-  "051":{en:"Giddy Gastropog",jp:"メダパニつむり",g:16},
-  "052":{en:"Gloomy Gastropog",jp:"ダークデンデン",g:16},
-  "053":{en:"Earthenwarrior",jp:"はにわナイト",g:16},
-  "056":{en:"Skeleton Soldier",jp:"死霊の騎士",g:32},
-  "057":{en:"Dark Skeleton",jp:"影の騎士",g:24},
-  "059":{en:"Diethon",jp:"ヘルバイパー",g:16},
-  "05A":{en:"Sail Serpent",jp:"オーシャンナーガ",g:20},
-  "05D":{en:"Belisha Beakon",jp:"アカイライ",g:12},
-  "05E":{en:"Lesionnaire",jp:"がいこつ兵",g:20},
-  "05F":{en:"Deadcurion",jp:"しにがみ兵",g:20},
-  "060":{en:"Stenchurion",jp:"ゾンビナイト",g:16},
-  "062":{en:"Teaky Mask",jp:"トーテムキラー",g:16},
-  "063":{en:"Bewarewolf",jp:"リカント",g:12},
-  "065":{en:"Scarewolf",jp:"リカントマムル",g:16},
-  "067":{en:"Toxic Zombie",jp:"どくどくゾンビ",g:16},
-  "068":{en:"Ghoul",jp:"グール",g:8},
-  "06A":{en:"Spinchilla",jp:"うずしおキング",g:16},
-  "06B":{en:"Whirly Girly",jp:"レッドサイクロン",g:20},
-  "06D":{en:"Mummy",jp:"マミー",g:8},
-  "06E":{en:"Blood Mummy",jp:"ブラッドマミー",g:16},
-  "070":{en:"Wyrtoise",jp:"ガメゴンロード",g:16},
-  "072":{en:"Rampage",jp:"ゴートドン",g:12},
-  "074":{en:"Rockbomb",jp:"ばくだん岩",g:20},
-  "076":{en:"Bomboulder",jp:"メガザルロック",g:16},
-  "077":{en:"Restless Armour",jp:"さまようよろい",g:16},
-  "078":{en:"Infernal Armour",jp:"じごくのよろい",g:16},
-  "079":{en:"Lethal Armour",jp:"キラーアーマー",g:16},
-  "07B":{en:"Metal Slime Knight",jp:"メタルライダー",g:16},
-  "07C":{en:"Swinoceros",jp:"突げきホーン",g:20},
-  "07D":{en:"Splatterhorn",jp:"ライノキング",g:16},
-  "07F":{en:"Admirer",jp:"ジェリーマン",g:16},
-  "080":{en:"Live Lava",jp:"マグマロン",g:12},
-  "082":{en:"Big Badboon",jp:"バブーン",g:12},
-  "083":{en:"Brainy Badboon",jp:"ヒババンゴ",g:12},
-  "084":{en:"Magus",jp:"まじゅつし",g:12},
-  "086":{en:"Sorcerer",jp:"ようじゅつし",g:16},
-  "087":{en:"Mandrake Major",jp:"リザードマン",g:16},
-  "088":{en:"Mandrake Marauder",jp:"りゅう兵士",g:20},
-  "089":{en:"Mandrake Marshal",jp:"シュプリンガー",g:16},
-  "08B":{en:"Treevil",jp:"ウドラー",g:12},
-  "08C":{en:"Chimaera",jp:"キメラ",g:8},
-  "08D":{en:"Hocus Chimaera",jp:"メイジキメラ",g:16},
-  "08F":{en:"Raving Reaper",jp:"アサシンドール",g:16},
-  "092":{en:"Badja",jp:"ブラックタヌー",g:16},
-  "094":{en:"Corrupt Carter",jp:"エビルチャリオット",g:20},
-  "095":{en:"Mortoad",jp:"ガマキャノン",g:16},
-  "096":{en:"Expload",jp:"デザートタンク",g:16},
-  "097":{en:"Blastoad",jp:"キャノンキング",g:16},
-  "099":{en:"Peckerel",jp:"アサシンエミュー",g:20},
-  "09D":{en:"Knocktopus",jp:"ニードルオクト",g:16},
-  "09E":{en:"Shocktopus",jp:"オクトスパイカー",g:20},
-  "09F":{en:"Manguini",jp:"アーゴンデビル",g:16},
-  "0A0":{en:"Bloody Manguini",jp:"ブラッドアーゴン",g:20},
-  "0A2":{en:"Great Gruffon",jp:"ビッグボック",g:16},
-  "0A3":{en:"Gramarye Gruffon",jp:"アロダイタス",g:16},
-  "0A4":{en:"Trigertaur",jp:"タイガーランス",g:16},
-  "0A5":{en:"White Trigertaur",jp:"ホワイトランサー",g:20},
-  "0A6":{en:"Sick Trigertaur",jp:"キマライガー",g:16},
-  "0A7":{en:"Moosifer",jp:"アンクルホーン",g:16},
-  "0A8":{en:"Barbatos",jp:"ヘルバトラー",g:16},
-  "0A9":{en:"Green Dragon",jp:"グリーンドラゴン",g:20},
-  "0AA":{en:"Red Dragon",jp:"レッドドラゴン",g:16},
-  "0AB":{en:"Rashaverak",jp:"アンドレアル",g:16},
-  "0AC":{en:"Living Statue",jp:"うごくせきぞう",g:16},
-  "0AE":{en:"Drakularge",jp:"ギガントヒルズ",g:16},
-  "0AF":{en:"Drakulard",jp:"ギガントドラゴン",g:20},
-  "0B0":{en:"Drakulord",jp:"ドラゴン・ウー",g:16},
-  "0B1":{en:"Hunter Mech",jp:"メタルハンター",g:16},
-  "0B2":{en:"Killing Machine",jp:"キラーマシン",g:16},
-  "0B3":{en:"King Slime",jp:"キングスライム",g:16},
-  "0B4":{en:"King Cureslime",jp:"スライムベホマズン",g:20},
-  "0B5":{en:"Metal King Slime",jp:"メタルキング",g:16},
-  "0B6":{en:"Cumulus Rex",jp:"くもの大王",g:28},
-  "0B7":{en:"Cumulus Vex",jp:"ヘルクラウダー",g:16},
-  "0B8":{en:"Darkonium Slime",jp:"スライムマデュラ",g:20},
-  "0B9":{en:"Gem Slime",jp:"ゴールデンスライム",g:20},
-  "0BA":{en:"Stone Golem",jp:"ストーンマン",g:16},
-  "0BB":{en:"Gold Golem",jp:"ゴールドマン",g:16},
-  "0BC":{en:"Golem",jp:"ゴーレム",g:12},
-  "0BD":{en:"Drackal",jp:"ストロングアニマル",g:20},
-  "0BE":{en:"Drastic Drackal",jp:"ヘルジャッカル",g:16},
-  "0C0":{en:"Harmour",jp:"デビルアーマー",g:16},
-  "0C1":{en:"Bad Karmour",jp:"てっこうまじん",g:16},
-  "0C2":{en:"Alarmour",jp:"サタンメイル",g:16},
-  "0C3":{en:"Fright Knight",jp:"ナイトリッチ",g:16},
-  "0C4":{en:"Night Knight",jp:"ナイトキング",g:16},
-  "0C5":{en:"Terrorhawk",jp:"マッドファルコン",g:20},
-  "0C6":{en:"Prism Peacock",jp:"にじくじゃく",g:16},
-  "0C7":{en:"Bird of Terrordise",jp:"れんごくまちょう",g:20},
-  "0C8":{en:"Mad Moai",jp:"ビッグモアイ",g:16},
-  "0C9":{en:"Mega Moai",jp:"ゴードンヘッド",g:16},
-  "0CA":{en:"Sculptrice",jp:"ヘルビースト",g:16},
-  "0CB":{en:"Sculpture Vulture",jp:"リビングスタチュー",g:20},
-  "0CC":{en:"Aggrosculpture",jp:"ウィングデビル",g:16},
-  "0CD":{en:"Wight Priest",jp:"デスプリースト",g:16},
-  "0CE":{en:"Wight King",jp:"ワイトキング",g:16},
-  "0CF":{en:"Claw Hammer",jp:"ヘルマリーン",g:16},
-  "0D0":{en:"Power Hammer",jp:"サンドシャーク",g:16},
-  "0D4":{en:"Python Priest",jp:"スネークロード",g:16},
-  "0D5":{en:"Cobra Cardinal",jp:"じごくのメンドーサ",g:20},
-  "0D6":{en:"Tantamount",jp:"れんごく天馬",g:24},
-  "0D7":{en:"Godsteed",jp:"レジェンドホース",g:20},
-  "0D9":{en:"Cyclops",jp:"サイクロプス",g:16},
-  "0DA":{en:"Gigantes",jp:"ギガンテス",g:12},
-  "0DC":{en:"Troll",jp:"トロル",g:8},
-  "0DD":{en:"Boss Troll",jp:"ボストロール",g:16},
-  "0DE":{en:"Great Troll",jp:"トロルキング",g:16},
-  "0DF":{en:"Magmalice",jp:"ようがんまじん",g:16},
-  "0E0":{en:"Firn Fiend",jp:"ひょうがまじん",g:16},
-  "0E2":{en:"Slionheart",jp:"ゴッドライダー",g:16},
-  "0E4":{en:"AU-1000",jp:"ゴールドマジンガ",g:20},
-  "0E5":{en:"Void Droid",jp:"ファイナルウェポン",g:20},
-  "0E6":{en:"Alphyn",jp:"キマイラロード",g:16},
-  "0E7":{en:"Vermil Lion",jp:"じごくのヌエ",g:16},
-  "0E8":{en:"Shivery Shrubbery",jp:"デビルスノー",g:16},
-  "0E9":{en:"Apeckalypse",jp:"ランドンクイナ",g:16},
-  "0EB":{en:"Wonder Wyrtle",jp:"ガメゴンレジェンド",g:20},
-  "0EC":{en:"Geothaum",jp:"あんこくまじん",g:16},
-  "0ED":{en:"Cosmic Chimaera",jp:"スターキメラ",g:16},
-  "0EE":{en:"Master Moosifer",jp:"デスカイザー",g:16},
-  "0EF":{en:"Freaky Tiki",jp:"まおうのかめん",g:16},
-  "0F0":{en:"Mandrake Monarch",jp:"まかいファイター",g:20},
-  "0F1":{en:"Cumulus Hex",jp:"ヘルミラージュ",g:16},
-  "0F2":{en:"Platinum King Jewel",jp:"プラチナキング",g:16},
-  "0F3":{en:"Charmour",jp:"マジックアーマー",g:20},
-  "0F4":{en:"Blight Knight",jp:"ヴァルハラー",g:16},
-  "0F5":{en:"Moai Minstrel",jp:"クラウンヘッド",g:16},
-  "0F6":{en:"Grrrgoyle",jp:"ホラービースト",g:16},
-  "0F7":{en:"Wight Emperor",jp:"ロードコープス",g:16},
-  "0F8":{en:"Boogie Manguini",jp:"イエローサタン",g:16},
-  "0F9":{en:"Barriearthenwarrior",jp:"ちていのばんにん",g:20},
-  "0FA":{en:"Grim Reaper",jp:"メフィストフェレス",g:20},
-  "0FB":{en:"Bling Badger",jp:"ゴールドタヌ",g:16},
-  "0FC":{en:"Flamin' Drayman",jp:"じごくぐるま",g:16},
-  "0FD":{en:"Hammer Horror",jp:"ダークマリーン",g:16},
-  "0FE":{en:"Boa Bishop",jp:"ビュアール",g:12},
-  "0FF":{en:"Handsome Crab",jp:"ガニラス",g:12},
-  "101":{en:"Crabber Dabber Doo",jp:"じごくのハサミ",g:16},
-  "102":{en:"King Crab",jp:"キラークラブ",g:16},
-  "103":{en:"Icikiller",jp:"アイスビックル",g:16},
-  "104":{en:"Riptide",jp:"オーシャンクロー",g:20},
-  "105":{en:"Claws",jp:"クローハンズ",g:16},
-  "106":{en:"Seasaur",jp:"ギャオース",g:12},
-  "107":{en:"Abyss Diver",jp:"ヘルダイバー",g:16},
-  "108":{en:"Seavern",jp:"シーバーン",g:12},
-  "109":{en:"Terror Troll",jp:"ダークトロル",g:16},
-  "10C":{en:"Prime Slime",jp:"デンガー",g:12},
-  "141":{en:"Octagoon",jp:"アイアンブルドー",g:20},
-  "143":{en:"Cannibelle",jp:"ヘルヴィーナス",g:16},
-  "144":{en:"Scarlet Fever",jp:"エビルフレイム",g:16},
-  "145":{en:"Uncommon Cold",jp:"マッドブリザード",g:20},
-  "147":{en:"Stale Whale",jp:"だいおうクジラ",g:16},
-  "148":{en:"Pale Whale",jp:"オーシャンボーン",g:20},
-  "149":{en:"Widow's Pique",jp:"デスタランチュラ",g:20},
-  "14A":{en:"Cyber Spider",jp:"ボーンスパイダ",g:16},
-  "14B":{en:"Slugly Betsy",jp:"うみうしひめ",g:16},
-  "14D":{en:"Hell's Gatekeeper",jp:"ヘルガーディアン",g:20},
-  "14E":{en:"Wishmaster",jp:"ギリメカラ",g:12},
-  "025":{en:"Jinkster",jp:"ひとつめピエロ"},
-  "032":{en:"Gum Shield",jp:"ビッグフェイス"},
-  "04B":{en:"Slime Stack",jp:"スライムタワー"},
-  "054":{en:"Brrearthenwarrior",jp:"ふゆしょうぐん"},
-  "05C":{en:"Weaken Beakon",jp:"デッドペッカー"},
-  "064":{en:"Tearwolf",jp:"キラーリカント"},
-  "08A":{en:"Treeface",jp:"じんめんじゅ"},
-  "0AD":{en:"Stone Guardian",jp:"だいまじん"},
-  "100":{en:"Crabid",jp:"ぐんたいガニ"},
+  "008":{en:"Lost Soul",jp:"さまようたましい"},
+  "00B":{en:"Mushroom Mage",jp:"マージマタンゴ"},
+  "012":{en:"Sootheslime",jp:"ベホイムスライム"},
+  "013":{en:"Cureslime",jp:"ベホマスライム"},
+  "015":{en:"Robo-robin",jp:"アイアンクック"},
+  "01B":{en:"Liquid Metal Slime",jp:"はぐれメタル"},
+  "02A":{en:"Raving Lunatick",jp:"メーダロード"},
+  "02E":{en:"Hell Niño",jp:"ヒートギズモ"},
+  "02F":{en:"Freezing Fog",jp:"フロストギズモ"},
+  "031":{en:"Grim Grinner",jp:"ダークホビット"},
+  "034":{en:"Sluggernaut",jp:"スーパーテンツク"},
+  "035":{en:"Sluggerslaught",jp:"ラストテンツク"},
+  "036":{en:"Pink Sanguini",jp:"ピンクモーモン"},
+  "037":{en:"Genie Sanguini",jp:"マポレーナ"},
+  "03D":{en:"Salamarauder",jp:"かいぞくウーパー"},
+  "03E":{en:"Axolhotl",jp:"ウパパロン"},
+  "040":{en:"Bagma",jp:"ようがんピロー"},
+  "04D":{en:"Gem Jamboree",jp:"ゴールデントーテム"},
+  "051":{en:"Giddy Gastropog",jp:"メダパニつむり"},
+  "052":{en:"Gloomy Gastropog",jp:"ダークデンデン"},
+  "053":{en:"Earthenwarrior",jp:"はにわナイト"},
+  "056":{en:"Skeleton Soldier",jp:"死霊の騎士"},
+  "057":{en:"Dark Skeleton",jp:"影の騎士"},
+  "059":{en:"Diethon",jp:"ヘルバイパー"},
+  "05D":{en:"Belisha Beakon",jp:"アカイライ"},
+  "062":{en:"Teaky Mask",jp:"トーテムキラー"},
+  "068":{en:"Ghoul",jp:"グール"},
+  "076":{en:"Bomboulder",jp:"メガザルロック"},
+  "080":{en:"Live Lava",jp:"マグマロン"},
+  "086":{en:"Sorcerer",jp:"ようじゅつし"},
+  "097":{en:"Blastoad",jp:"キャノンキング"},
+  "0AA":{en:"Red Dragon",jp:"レッドドラゴン"},
+  "0AB":{en:"Rashaverak",jp:"アンドレアル"},
+  "0B0":{en:"Drakulord",jp:"ドラゴン・ウー"},
+  "0B2":{en:"Killing Machine",jp:"キラーマシン"},
+  "0B5":{en:"Metal King Slime",jp:"メタルキング"},
+  "0B8":{en:"Darkonium Slime",jp:"スライムマデュラ"},
+  "0B9":{en:"Gem Slime",jp:"ゴールデンスライム"},
+  "0C3":{en:"Fright Knight",jp:"ナイトリッチ"},
+  "0C7":{en:"Bird of Terrordise",jp:"れんごくまちょう"},
+  "0D7":{en:"Godsteed",jp:"レジェンドホース"},
+  "0E4":{en:"AU-1000",jp:"ゴールドマジンガ"},
+  "0EC":{en:"Geothaum",jp:"あんこくまじん"},
+  "0F0":{en:"Mandrake Monarch",jp:"まかいファイター"},
 };
 
 const G_VALUES = {
@@ -422,85 +273,10 @@ const ONLY_MONSTERS = {
 
 function matchesOnlyMonFloor(env,floorMR,name){return MONSTER_DB[ONLY_MONSTERS[env][floorMR]].en===name;}
 
-const SPAWN_DB = {
-  1:{
-    1: [["00B",6555,13107],["00E",13108,19661],["022",0,6554],["026"],["027"],["028"],["082",26215,32767],["08C",19662,26214]],
-    2: [["026"],["027"],["028"],["036",6555,13107],["03B",19662,26214],["063",0,6554],["087",26215,32767],["0BD",13108,19661]],
-    3: [["026"],["027"],["028"],["034",13108,19661],["083",6555,13107],["08B",26215,32767],["099",0,6554],["101",19662,26214]],
-    4: [["026"],["027"],["028"],["076",0,6554],["07C",13108,19661],["080",19662,26214],["0AE",26215,32767],["0D9",6555,13107]],
-    5: [["026"],["027"],["028"],["052",13108,19661],["07D",6555,13107],["0B6",19662,26214],["0C5",0,6554],["0DD",26215,32767]],
-    6: [["026"],["027"],["028"],["02F",26215,32767],["089",0,6554],["097",6555,13107],["0A9",19662,26214],["105",13108,19661]],
-    7: [["026"],["027"],["028"],["04D",16385,18724],["089",25747,32767],["0B4",0,8192],["0B7",18725,25746],["0D5",8193,16384]],
-    8: [["026"],["027"],["028"],["037",0,5958],["0C6",25818,32767],["0F5",5959,11916],["102",18867,25817],["109",11917,18866]],
-    9: [["026"],["027"],["028"],["035",13903,20852],["0AF",26811,32767],["0ED",0,6951],["109",20853,26810],["14E",6952,13902]],
-    10: [["026"],["027"],["028"],["0B5",31555,32767],["0ED",16992,24272],["0F1",0,8496],["147",8497,16991],["14E",24273,31554]],
-    11: [["026"],["027"],["028"],["035",21846,26214],["0D7",7647,15292],["0E2",0,7646],["0ED",26215,32767],["147",15293,21845]],
-    12: [["026"],["027"],["028"],["0D7",20481,26624],["0E2",14337,20480],["0EB",0,7168],["0F1",26625,32767],["149",7169,14336]],
-  },
-  2:{
-    1: [["026"],["027"],["028"],["053",19662,26214],["077",0,6554],["084",13108,19661],["096",26215,32767],["0BA",6555,13107]],
-    2: [["026"],["027"],["028"],["02A",6555,13107],["09F",26215,32767],["0A4",19662,26214],["0C8",13108,19661],["0DC",0,6554]],
-    3: [["026"],["027"],["028"],["040",11917,22342],["04C",10427,11916],["0A3",22343,32767],["0B1",0,10426]],
-    4: [["026"],["027"],["028"],["034",13108,19661],["062",6555,13107],["086",26215,32767],["08F",19662,26214],["0AC",0,6554]],
-    5: [["026"],["027"],["028"],["062",13108,19661],["094",19662,26214],["0B2",6555,13107],["0CB",0,6554],["0DD",26215,32767]],
-    6: [["026"],["027"],["028"],["097",13108,19661],["0A6",26215,32767],["0BC",0,6554],["0D5",19662,26214],["105",6555,13107]],
-    7: [["01B",0,1425],["026"],["027"],["028"],["0B8",5700,12822],["0DE",12823,22795],["105",22796,32767],["141",1426,5699]],
-    8: [["026"],["027"],["028"],["035",18725,23405],["04D",29648,32767],["0A8",23406,29647],["0B8",0,10923],["141",10924,18724]],
-    9: [["026"],["027"],["028"],["035",28836,32767],["0B8",15730,19661],["0C2",6555,15729],["0EF",0,6554],["141",19662,28835]],
-    10: [["026"],["027"],["028"],["04D",31555,32767],["0C2",24273,31554],["0EF",16992,24272],["0FE",0,8496],["14A",8497,16991]],
-    11: [["026"],["027"],["028"],["0B9",4856,7282],["0E6",0,4855],["0EF",24273,32767],["0FE",7283,15777],["14A",15778,24272]],
-    12: [["026"],["027"],["028"],["0E4",0,7282],["0E5",7283,14564],["0E6",14565,20025],["0F2",20026,21845],["14A",21846,32767]],
-  },
-  3:{
-    1: [["008",0,8192],["026"],["027"],["028"],["067",16385,24576],["06A",24577,32767],["06D",8193,16384]],
-    2: [["012",26215,32767],["026"],["027"],["028"],["05F",0,6554],["065",6555,13107],["072",13108,19661],["0CA",19662,26214]],
-    3: [["026"],["027"],["028"],["068",13108,19661],["06D",6555,13107],["0A5",0,6554],["0E8",26215,32767],["0E9",19662,26214]],
-    4: [["026"],["027"],["028"],["056",19662,26214],["079",13108,19661],["0A2",6555,13107],["0A5",0,6554],["0D9",26215,32767]],
-    5: [["026"],["027"],["028"],["031",13108,19661],["0BE",0,6554],["0CC",26215,32767],["0D9",19662,26214],["103",6555,13107]],
-    6: [["026"],["027"],["028"],["0B2",19662,26214],["0B7",26215,32767],["0C1",6555,13107],["0CC",13108,19661],["103",0,6554]],
-    7: [["026"],["027"],["028"],["02F",26215,32767],["0B7",19662,26214],["0C1",6555,13107],["0CE",0,6554],["0DE",13108,19661]],
-    8: [["026"],["027"],["028"],["05D",26811,32767],["0C4",13903,20852],["0E0",20853,26810],["0F3",0,6951],["143",6952,13902]],
-    9: [["026"],["027"],["028"],["0B8",13903,20852],["0E0",26811,32767],["0F7",6952,13902],["0FA",0,6951],["143",20853,26810]],
-    10: [["026"],["027"],["028"],["0B9",31130,32767],["0F6",0,11469],["0F7",21300,31129],["0FA",11470,21299]],
-    11: [["026"],["027"],["028"],["0EC",8823,17644],["0F6",17645,25206],["0FA",25207,32767],["145",0,8822]],
-    12: [["026"],["027"],["028"],["0EC",17040,24903],["0F4",0,9175],["0F8",24904,32767],["145",9176,17039]],
-  },
-  4:{
-    1: [["026"],["027"],["028"],["03D",19662,26214],["05E",0,6554],["09D",6555,13107],["0CF",26215,32767],["104",13108,19661]],
-    2: [["026"],["027"],["028"],["051",26215,32767],["095",19662,26214],["09E",13108,19661],["0B3",6555,13107],["0D4",0,6554]],
-    3: [["026"],["027"],["028"],["059",19662,26214],["06E",6555,13107],["0A2",13108,19661],["0CD",0,6554],["104",26215,32767]],
-    4: [["013",6555,13107],["026"],["027"],["028"],["05A",0,6554],["0A0",13108,19661],["0FF",26215,32767],["106",19662,26214]],
-    5: [["026"],["027"],["028"],["057",26215,32767],["060",6555,13107],["070",19662,26214],["0B4",13108,19661],["107",0,6554]],
-    6: [["026"],["027"],["028"],["057",6555,13107],["0A8",26215,32767],["0A9",0,6554],["0B4",19662,26214],["102",13108,19661]],
-    7: [["026"],["027"],["028"],["037",26215,32767],["0A8",19662,26214],["0AF",0,6554],["0DA",13108,19661],["102",6555,13107]],
-    8: [["026"],["027"],["028"],["0B5",16385,18724],["0DA",25747,32767],["0F3",18725,25746],["0F5",8193,16384],["14B",0,8192]],
-    9: [["026"],["027"],["028"],["0F0",6952,13902],["0F3",26811,32767],["0F5",20853,26810],["0F8",0,6951],["14B",13903,20852]],
-    10: [["026"],["027"],["028"],["0F0",20481,26624],["0F8",14337,20480],["0FB",0,7168],["10C",7169,14336],["14B",26625,32767]],
-    11: [["026"],["027"],["028"],["0B0",7169,14336],["0F8",26625,32767],["0FB",14337,20480],["0FD",0,7168],["10C",20481,26624]],
-    12: [["026"],["027"],["028"],["0B0",18725,25746],["0FD",11704,18724],["108",3512,11703],["10C",25747,32767],["148",0,3511]],
-  },
-  5:{
-    1: [["026"],["027"],["028"],["03E",6555,13107],["074",26215,32767],["07B",0,6554],["07F",13108,19661],["0C8",19662,26214]],
-    2: [["026"],["027"],["028"],["086",19662,26214],["087",26215,32767],["08D",0,6554],["0BB",6555,13107],["0D0",13108,19661]],
-    3: [["015",6555,13107],["026"],["027"],["028"],["02C",19662,26214],["078",26215,32767],["08C",0,6554],["0DC",13108,19661]],
-    4: [["01B",15820,16949],["026"],["027"],["028"],["040",0,7910],["078",7911,15819],["0A7",24859,32767],["0B1",16950,24858]],
-    5: [["026"],["027"],["028"],["080",0,6554],["088",19662,26214],["092",26215,32767],["0A7",6555,13107],["0C9",13108,19661]],
-    6: [["026"],["027"],["028"],["02E",19662,26214],["06B",6555,13107],["0B2",0,6554],["0C0",26215,32767],["0DF",13108,19661]],
-    7: [["026"],["027"],["028"],["0AA",19662,26214],["0C0",13108,19661],["0C3",0,6554],["0C6",6555,13107],["0DF",26215,32767]],
-    8: [["026"],["027"],["028"],["0C3",13903,20852],["0D5",26811,32767],["0D6",6952,13902],["0DA",20853,26810],["0FC",0,6951]],
-    9: [["026"],["027"],["028"],["0B5",30428,32767],["0D6",23406,30427],["0F9",0,8192],["0FC",16385,23405],["109",8193,16384]],
-    10: [["026"],["027"],["028"],["0C7",0,7910],["0F9",15820,22598],["0FC",29379,32767],["109",22599,29378],["144",7911,15819]],
-    11: [["026"],["027"],["028"],["0AB",7169,14336],["0C7",14337,20480],["0F9",26625,32767],["144",20481,26624],["14D",0,7168]],
-    12: [["026"],["027"],["028"],["0AB",18725,25746],["0C7",25747,32767],["0E7",8193,11703],["0EE",0,8192],["14D",11704,18724]],
-  },
-};
-
 const _elistWtL = new Uint8Array(256);
 const _elistWtU = new Uint8Array(256);
 
 function floorMRAt(baseMR,f) {return Math.min(12,baseMR+(f>>2));}
-
-function getSpawnList(envType,floorMR) {return (SPAWN_DB[envType] && SPAWN_DB[envType][floorMR]) || [];}
 
 function getMonsterDisplayName(hx) {
   const m = MONSTER_DB[hx];
@@ -573,17 +349,16 @@ function getFloorElistInfo(map,f) {
   const F = (isIce10_12 || isRuins3 || isIce1) ? 7 : 8;
   const ElistOfs = A+4+(B*8)+(D*4)+(F*20)+(F*8)+G;
 
-  const val = ElistOfs;
   let state = null;
 
-  if (val<=0x2B30) {
+  if (ElistOfs<=0x2B30) {
     if (D !== 0) state = EL_P;
-  } else if (val>=0x2B34) {
+  } else if (ElistOfs>=0x2B34) {
     const isExc1 = isIce10_12 || isRuins3;
     const isExc2 = (envType===2&&floorMR===7)||(envType===5&&(floorMR===3||floorMR===4))||(envType===3&&floorMR===2)||(envType===4&&floorMR===4);
     const isExc4 = isIce1;
     const isExc5 =(envType===1&&floorMR===1);
-    const EL_diff = Math.floor((val-0x2B34)/20);
+    const EL_diff = Math.floor((ElistOfs-0x2B34)/20);
     switch (EL_diff) {
       case 0: state = (isExc1||isExc4) ? (D!== 0?EL_P:null) : EL_4;break;
       case 1: state = EL_3;break;
@@ -595,18 +370,17 @@ function getFloorElistInfo(map,f) {
       default: state = EL_0+EL_NC;break;
     }
   }
-  if(state!==null)state=String(state);
-  return{hex:ElistOfs.toString(16).toUpperCase(),state:state};
+  return{state};
 }
 
 function classifyElistState(st) {
   st = ''+st;
-  if (st.includes(''+EL_0) && !st.includes(''+EL_P)) return {kind:'none'};
+  if (st.includes(EL_0) && !st.includes(EL_P)) return {kind:'none'};
   if (st.includes(EL_ONLY)) return {kind:'only'};
-  if (st.includes(''+EL_4)) return {kind:'reduced',count:4};
-  if (st.includes(''+EL_3)) return {kind:'reduced',count:3};
-  if (st.includes(''+EL_2)) return {kind:'reduced',count:2};
-  if (st.includes(''+EL_P)) return {kind:'partial'};
+  if (st.includes(EL_4)) return {kind:'reduced',count:4};
+  if (st.includes(EL_3)) return {kind:'reduced',count:3};
+  if (st.includes(EL_2)) return {kind:'reduced',count:2};
+  if (st.includes(EL_P)) return {kind:'partial'};
   return {kind:'normal'};
 }
 
@@ -896,7 +670,7 @@ function matchesLocationBQ(locData,locNum,targetLocNum,targetBqNum) {
     &&(targetBqNum === null || bqs.has(targetBqNum));
 }
 
-function hex2(n) {return n.toString(16).toUpperCase().padStart(2,'0');}
+function hex(n, width) {return n.toString(16).toUpperCase().padStart(width,'0');}
 
 function buildOnlyMonExpectedStr(conds) {
   if (!((conds!==null&&conds!==void 0)&&conds.onlyMon))return'';
@@ -966,11 +740,6 @@ function checkUltimateCondsMatch(engine,seed,targetRankKey,conds,searchFilterLoc
   return true;
 }
 
-function isCombinedOnlyHit(envType,floorMR,onlyMonNameStr) {
-  if (!getSpawnList(envType,floorMR).length) return false;
-  return matchesOnlyMonFloor(envType,floorMR,onlyMonNameStr);
-}
-
 function evalElistFloorHit(searchEngine,f,info,elistCond) {
   const {kind, count} = classifyElistState(info.state);
   const targetCount = kind === 'reduced' ? count : 0;
@@ -1012,7 +781,7 @@ function checkElistAndD(searchEngine, conds, _onlyMonExpectedStr) {
     const isElistHit = evalElistFloorHit(searchEngine, f, info, conds.elist);
 
     const isCombinedMatchedThisFloor = isCombinedSearch && isElistHit &&
-      isCombinedOnlyHit(envType,floorMRAt(baseMR,f),conds.onlyMon);
+      matchesOnlyMonFloor(envType,floorMRAt(baseMR,f),conds.onlyMon);
 
     specialFloorCount++;
     currentMapSpecials.push(f);
@@ -1062,7 +831,7 @@ function rankCanDropInMRRange(r, numMin, numMax) {
 }
 
 function getRankSMRInfo(rank, conds) {
-  let rStr = hex2(rank);
+  let rStr = hex(rank, 2);
 
   if (conds && hasConditionValue(conds.bq)) {
     const bounds = getFinalQualityBounds(conds.bq);
@@ -1114,17 +883,29 @@ function getRankSMRInfo(rank, conds) {
   return {minSMR, maxSMR, maxFloorCount, minBoss, maxBoss};
 }
 
-function sharedRankFilter(ranksToSearch, conds) {
-  if (!getLocationBQFilters(conds).valid) return [];
-
-  if (!conds.onlyMon && !conds.monster && !hasConditionValue(conds.bq) && !conds.hasBoxCond && !conds.prefix && !conds.suffix && !conds.lv && !conds.depth && !conds.depth2 && !conds.boss) {
-    return ranksToSearch;
+function filterRanks(ranksToSearch, conds, chestRankGroups, targetFloorOffset) {
+  if (!chestRankGroups) {
+    if (!getLocationBQFilters(conds).valid) return [];
+    if (!conds.onlyMon && !conds.monster && !hasConditionValue(conds.bq) && !conds.hasBoxCond && !conds.prefix && !conds.suffix && !conds.lv && !conds.depth && !conds.depth2 && !conds.boss) return ranksToSearch;
   }
 
   return ranksToSearch.filter(rank => {
     const info = getRankSMRInfo(rank, conds);
     if (!info) return false;
     const {minSMR, maxSMR, maxFloorCount, minBoss, maxBoss} = info;
+
+    if (chestRankGroups) {
+      if (chestRankGroups.length === 0) return true;
+      let minFloor = 0;
+      let maxFloor = maxFloorCount - 1;
+      if (targetFloorOffset != null) {
+        minFloor = maxFloor = targetFloorOffset * 4;
+        if (maxFloorCount <= minFloor) return false;
+      }
+      const minPossibleNum = floorMRAt(minSMR, minFloor);
+      const maxPossibleNum = floorMRAt(maxSMR, maxFloor);
+      return chestRankGroups.every(group => group.some(r => rankCanDropInMRRange(r, minPossibleNum, maxPossibleNum)));
+    }
 
     if (conds.prefix) {
       const p = parseInt(conds.prefix);
@@ -1183,8 +964,7 @@ function sharedRankFilter(ranksToSearch, conds) {
 const ITEMS_MILLIONAIRE = ["Hero spear","Pruning knife","Wyrmwand","Wizardly whip","Beast claws","Attribeauty","Heavy hatchet","Megaton hammer","Pentarang","Metal slime sword","Metal slime spear"];
 const ITEMS_MILLIONAIRE_BOX3 = ITEMS_MILLIONAIRE.slice(0, 7);
 const ITEMS_S_WEAPONS = ["Stardust sword","Poker","Deft dagger","Bright staff","Gringham whip","Knockout rod","Dragonlord claws","Critical fan","Bad axe","Groundbreaker","Meteorang","Angel's bow"];
-const ITEMS_METAL_SLIME = ["Metal slime sword","Metal slime spear","Metal slime shield","Metal slime armour","Metal slime helm","Metal slime gauntlets","Metal slime sollerets"];
-const ITEM_GROUPS = new Map([['Millionaire', ITEMS_MILLIONAIRE], ['S weapon', ITEMS_S_WEAPONS], ['Metasla', ITEMS_METAL_SLIME]]);
+const ITEM_GROUPS = new Map([['Millionaire', ITEMS_MILLIONAIRE], ['S weapon', ITEMS_S_WEAPONS]]);
 function expandItemGroup(v) {return ITEM_GROUPS.get(v) || [v];}
 const ITEM_GROUP_JP = {'Millionaire': '大富豪', 'S weapon': 'S武器'};
 const ITEM_JP = new Map(D_R);
@@ -1203,31 +983,6 @@ function getChestRanksForItems(itemNames){
   return ranks;
 }
 
-function filterMapRanksBySMRAndChest(ranksToSearch, conds, chestRankGroups, targetFloorOffset) {
-  return ranksToSearch.filter(rank => {
-    const info = getRankSMRInfo(rank, conds);
-    if (!info) return false;
-    const {minSMR, maxSMR, maxFloorCount} = info;
-
-    if (!chestRankGroups || chestRankGroups.length === 0) return true;
-
-    let minFloor = 0;
-    let maxFloor = maxFloorCount - 1;
-
-    if (targetFloorOffset != null) {
-      minFloor = maxFloor = targetFloorOffset * 4;
-      if (maxFloorCount <= minFloor) return false;
-    }
-
-    let minPossibleNum = floorMRAt(minSMR, minFloor);
-    let maxPossibleNum = floorMRAt(maxSMR, maxFloor);
-
-    return chestRankGroups.every(group =>
-      group.some(r => rankCanDropInMRRange(r, minPossibleNum, maxPossibleNum))
-    );
-  });
-}
-
 function chestCondsMatch(engine,conds){
   if (!conds.hasBoxCond) return true;
   for (let r=10;r>=1;r--) if (conds.reqBox[r]>0 && engine.chestRankCounts[r-1] !== conds.reqBox[r]) return false;
@@ -1240,28 +995,25 @@ const minAstar = arr => {const m = Math.min(...arr.map(v => v == null ? Infinity
 
 const CHEST_TIMER_OFFSET = 5;
 
-const meetsQuickloadBasicReq = (eng, p, conds) => eng.floorCount >=(p.isB9F ? 9 : 3) && filterMapRanksBySMRAndChest([eng.rank], conds, [p.chestRanks], p.isB9F ? 2 : 0).length > 0;
+const meetsQuickloadBasicReq = (eng, p, conds) => eng.floorCount >=(p.isB9F ? 9 : 3) && filterRanks([eng.rank], conds, [p.chestRanks], p.isB9F ? 2 : 0).length > 0;
 
 const ITEM_BASIC_REQS = {
   quickload: meetsQuickloadBasicReq,
   quickload9: meetsQuickloadBasicReq,
-  third: (eng, p, conds) => eng.floorCount >=(p.isS3 ? 14 : 4) && filterMapRanksBySMRAndChest([eng.rank], conds, [p.chestRanks], p.isS3 ? 3 : 0).length > 0,
+  third: (eng, p, conds) => eng.floorCount >=(p.isS3 ? 14 : 4) && filterRanks([eng.rank], conds, [p.chestRanks], p.isS3 ? 3 : 0).length > 0,
   jfire: eng => eng.smr === 9 && eng.floorCount >= 9,
   tk: eng => eng.floorCount >= 3,
 };
 
-const QL_MARK_5 = {sec: 0, mk: '⑤', mkColor: '#7fd4ff'}, QL_MARK_9 = {sec: 4, mk: '⑨', mkColor: '#b19cd9'};
+const QL_MARK_5 = {sec: 0, mk: '⑤'}, QL_MARK_9 = {sec: 4, mk: '⑨'};
 const getQuickloadMark = (p) => (p.qlSec === 0 ? QL_MARK_5 : QL_MARK_9);
-const QL_SOLO = {sec: 1, mk: STR_SOLO, mkColor: '#f9b'}, QL_PARTY = {sec: 2, mk: STR_PARTY, mkColor: '#ffd700'};
+const QL_SOLO = {sec: 1, mk: STR_SOLO}, QL_PARTY = {sec: 2, mk: STR_PARTY};
 
 const buildQuickloadResult = (eng, p, st) => {
   if (st.useB10) return st.multi.length > 0 ? {isHit: true, multi: st.multi} : {isHit:false};
   if (st.hitTypes.length === 0) return {isHit:false};
-  const res = {isHit: true, jumpFloor: st.firstHitFloor, displayHtml: st.hitTypes.join('<br>')};
-  if (st.astarBoxes) {
-    res.astar = calcSameFloorChestChainCost(eng, st.astarFloor, st.astarBoxes);
-    if (st.astarBoxes.length > p.reqCount) res.astarX3 = true;
-  }
+  const res = {isHit: true, jumpFloor: st.firstHitFloor, text: st.hitTypes.join(' / '), astar: calcSameFloorChestChainCost(eng, st.astarFloor, st.astarBoxes)};
+  if (st.astarBoxes.length > p.reqCount) res.astarX3 = true;
   return res;
 };
 
@@ -1270,14 +1022,13 @@ function scanQuickloadFloors(eng, p, modeA, modeB) {
   let hitTypes = [];
   let firstHitFloor = -1;
   let astarBoxes = null, astarFloor = -1;
-  const useB10 = !!(p.checkB10 && p.isB9F);
+  const useB10 = p.isB9F;
   const floors = useB10 ? [8, 9] : p.targetFloors;
   const multi = [];
 
   for (let f of floors) {
     if (f >= eng.floorCount) continue;
-    let prefixStr = (p.isB9F && !useB10) ? 'B9F ' : `B${f + 1}F `;
-    let boxes = null, fHtml = '';
+    let boxes = null, fText = '';
     for (let i = 0; i < 2; i++) {
       const mode = i === 0 ? modeA : modeB;
       if (!mode) break;
@@ -1288,22 +1039,22 @@ function scanQuickloadFloors(eng, p, modeA, modeB) {
         if (checkSet.has(names[b])) {cnt++; hitIdx.push(b);}
       }
       if (cnt < p.reqCount) continue;
-      const line = `<span style="color:${mode.mkColor};font-size:11px">${prefixStr}${mode.mk} x${cnt}</span>`;
+      const line = `B${f + 1}F ${mode.mk} x${cnt}`;
       hitTypes.push(line);
-      fHtml = fHtml ? fHtml + '<br>' + line : line;
+      fText = fText ? fText + ' / ' + line : line;
       if (boxes === null) boxes = hitIdx;
     }
     if (boxes === null) continue;
     if (firstHitFloor === -1) {
       firstHitFloor = f;
-      if (p.wantAstar) {astarFloor = f; astarBoxes = boxes;}
+      astarFloor = f; astarBoxes = boxes;
     }
-    if (useB10) multi.push({floor: f, displayHtml: fHtml, astar: calcSameFloorChestChainCost(eng, f, boxes), isB10: f === 9, isX3: boxes.length > p.reqCount});
+    if (useB10) multi.push({floor: f, text: fText, astar: calcSameFloorChestChainCost(eng, f, boxes), isB10: f === 9, isX3: boxes.length > p.reqCount});
   }
   return buildQuickloadResult(eng, p, {useB10, multi, hitTypes, firstHitFloor, astarFloor, astarBoxes});
 }
 
-function scanWpFirstTwo(eng, p, fIdx, uniSec, wpSet, soloColor, hits, soloIdx, partyIdx) {
+function scanWpFirstTwo(eng, fIdx, uniSec, wpSet, hits, soloIdx, partyIdx) {
   const soloNames = eng.chestItems(fIdx, uniSec == null ? 1 : uniSec);
   const partyNames = uniSec == null ? eng.chestItems(fIdx, 2) : soloNames;
   let found = false;
@@ -1313,11 +1064,8 @@ function scanWpFirstTwo(eng, p, fIdx, uniSec, wpSet, soloColor, hits, soloIdx, p
     const sHit = wpSet.has(s), pHit = wpSet.has(pp);
     if (!sHit && !pHit) continue;
     let t = uniSec != null ? `${uniSec + CHEST_TIMER_OFFSET}s` : (sHit && pHit) ? STR_BOTH : (pHit ? STR_PARTY : STR_SOLO);
-    let color = soloColor;
-    if (uniSec != null) color = getQuickloadMark(p).mkColor;
-    else if (t === STR_PARTY) color = "#ffd700";
     let rName = CHEST_RANK[eng.floors[fIdx].chests[b].rank] || '?';
-    hits.push(`<span style="color:${color};font-size:11px">B${fIdx + 1}F ${rName}${b + 1}: ${dispItem(pHit ? pp : s)} (${t})</span>`);
+    hits.push(`B${fIdx + 1}F ${rName}${b + 1}: ${dispItem(pHit ? pp : s)} (${t})`);
     if (sHit) soloIdx.push(b);
     if (pHit) partyIdx.push(b);
     found = true;
@@ -1325,6 +1073,7 @@ function scanWpFirstTwo(eng, p, fIdx, uniSec, wpSet, soloColor, hits, soloIdx, p
   return found;
 }
 const JFIRE_WP_SET = new Set(["Sainted soma"]);
+const timerShift = p => p.qlSec == null ? [null, 0] : [p.qlSec, p.qlSec - 2];
 
 function getWpChestCases(uniSec, wpPartyIdx, wpSoloIdx) {
   if (uniSec != null) return wpPartyIdx.length ? [wpPartyIdx] :(wpSoloIdx.length ? [wpSoloIdx] : []);
@@ -1369,25 +1118,23 @@ const DUNGEON_CHECKERS = {
       if (p.checkItems.includes(p1) && p.checkItems.includes(p2)) {
         const res = {
           isHit: true, jumpFloor: f1,
-          displayHtml: `B${f1 + 1}F ${r1}3: ${dispItem(p1)}<br>B${f2 + 1}F ${r2}3: ${dispItem(p2)}`
+          text: `B${f1 + 1}F ${r1}3: ${dispItem(p1)} / B${f2 + 1}F ${r2}3: ${dispItem(p2)}`
         };
-        if (p.wantAstar) {
-          const up1 = eng.floors[f1].up, c1 = eng.floors[f1].chests[2], c2 = eng.floors[f2].chests[2];
-          const prefix = walkUpToFloor(eng, f1);
-          const forward = reportWalk(joinWalks(
-            prefix,
-            pointWalk(eng, f1, up1.x, up1.y, c1.x, c1.y),
-            crossFloorWalk(eng, f1, c1.x, c1.y, f2, c2.x, c2.y)
-          ));
-          const reverse = reportWalk(joinWalks(
-            prefix,
-            crossFloorWalk(eng, f1, up1.x, up1.y, f2, c2.x, c2.y),
-            crossFloorWalk(eng, f2, c2.x, c2.y, f1, c1.x, c1.y)
-          ));
-          const vals = [forward, reverse];
-          res.astar = minAstar(vals);
-          res.astarText = vals.map(fmtStepD).join(' / ');
-        }
+        const up1 = eng.floors[f1].up, c1 = eng.floors[f1].chests[2], c2 = eng.floors[f2].chests[2];
+        const prefix = walkUpToFloor(eng, f1);
+        const forward = reportWalk(joinWalks(
+          prefix,
+          pointWalk(eng, f1, up1.x, up1.y, c1.x, c1.y),
+          crossFloorWalk(eng, f1, c1.x, c1.y, f2, c2.x, c2.y)
+        ));
+        const reverse = reportWalk(joinWalks(
+          prefix,
+          crossFloorWalk(eng, f1, up1.x, up1.y, f2, c2.x, c2.y),
+          crossFloorWalk(eng, f2, c2.x, c2.y, f1, c1.x, c1.y)
+        ));
+        const vals = [forward, reverse];
+        res.astar = minAstar(vals);
+        res.astarText = vals.map(fmtStepD).join(' / ');
         return res;
       }
     }
@@ -1395,15 +1142,14 @@ const DUNGEON_CHECKERS = {
   },
 
   jfire: (eng, p) => {
-    const uniSec = (p.qlSec == null) ? null : p.qlSec;
-    const shift = uniSec == null ? 0 : uniSec - 2;
+    const [uniSec, shift] = timerShift(p);
     const SOMA = "Sainted soma", ELIXIR = "Sage's elixir";
 
     const scanWp = (wpFloor, thirdFloors, chooseShortest) => {
       if (wpFloor >= eng.floorCount) return null;
       const wpBoxCount = eng.floors[wpFloor].chests.length;
       const wpHits = [], wpSoloIdx = [], wpPartyIdx = [];
-      const wpMet = scanWpFirstTwo(eng, p, wpFloor, uniSec, JFIRE_WP_SET, "#f9d", wpHits, wpSoloIdx, wpPartyIdx);
+      const wpMet = scanWpFirstTwo(eng, wpFloor, uniSec, JFIRE_WP_SET, wpHits, wpSoloIdx, wpPartyIdx);
 
       if (!wpMet ||(wpBoxCount >= 3 && eng.chestItem(wpFloor, 2, 2 + shift) === SOMA)) return null;
 
@@ -1413,36 +1159,29 @@ const DUNGEON_CHECKERS = {
         const pItem = eng.chestItem(fIdx, 2, 2 + shift);
         if (pItem !== SOMA && pItem !== ELIXIR) continue;
         const target = {floor: fIdx, det: `B${fIdx + 1}F S3: ${dispItem(pItem)}`};
-        if (p.wantAstar) {
-          const c3 = eng.floors[fIdx].chests[2];
-          const tgt = [{g:fIdx, gx:c3.x, gy:c3.y}];
-          const vals = getWpChestCases(uniSec, wpPartyIdx, wpSoloIdx).map(bx => calcCrossFloorChestRouteCost(eng, wpFloor, bx, tgt));
-          target.astar = minAstar(vals);
-          if (vals.length === 2) target.astarText = `${fmtStepD(vals[0])} / ${fmtStepD(vals[1])}`;
-        }
+        const c3 = eng.floors[fIdx].chests[2];
+        const tgt = [{g:fIdx, gx:c3.x, gy:c3.y}];
+        const vals = getWpChestCases(uniSec, wpPartyIdx, wpSoloIdx).map(bx => calcCrossFloorChestRouteCost(eng, wpFloor, bx, tgt));
+        target.astar = minAstar(vals);
+        if (vals.length === 2) target.astarText = `${fmtStepD(vals[0])} / ${fmtStepD(vals[1])}`;
         targets.push(target);
       }
       if (targets.length === 0) return null;
 
       let best = targets[0];
-      if (chooseShortest && p.wantAstar) {
+      if (chooseShortest) {
         for (let i = 1; i < targets.length; i++) {
           const a = targets[i].astar == null ? Infinity : targets[i].astar;
           const b = best.astar == null ? Infinity : best.astar;
           if (a < b) best = targets[i];
         }
       }
-      const html = `${wpHits.join('<br>')}<br><span style="color:#11F514;font-size:11px">${best.det}</span>`;
-      const res = {isHit: true, jumpFloor: wpFloor, displayHtml: html};
-      if (p.wantAstar) {
-        res.astar = best.astar;
-        if (best.astarText !== undefined) res.astarText = best.astarText;
-      }
+      const res = {isHit: true, jumpFloor: wpFloor, text: `${wpHits.join(' / ')} / ${best.det}`, astar: best.astar};
+      if (best.astarText !== undefined) res.astarText = best.astarText;
       return res;
     };
 
     const main = scanWp(8, [8, 9], false);
-    if (!p.wantAstar) return main || {isHit:false};
 
     const extra = scanWp(9, [8, 9, 10], true);
     const multi = [];
@@ -1456,12 +1195,11 @@ const DUNGEON_CHECKERS = {
     let wpMet = false, wpFloor = 2;
     let wpHits = [];
     let wpSoloIdx = [], wpPartyIdx = [];
-    const uniSec = (p.qlSec == null) ? null : p.qlSec;
-    const shift = uniSec == null ? 0 : uniSec - 2;
+    const [uniSec, shift] = timerShift(p);
 
     let checkWp = (fIdx) => {
       if (fIdx >= eng.floorCount) return false;
-      if (!scanWpFirstTwo(eng, p, fIdx, uniSec, wpSet, "#f9b", wpHits, wpSoloIdx, wpPartyIdx)) return false;
+      if (!scanWpFirstTwo(eng, fIdx, uniSec, wpSet, wpHits, wpSoloIdx, wpPartyIdx)) return false;
       wpMet = true;
       wpFloor = fIdx;
       return true;
@@ -1485,15 +1223,11 @@ const DUNGEON_CHECKERS = {
       }
 
       if (c1Met) {
-        let html = `${wpHits.join('<br>')}<br><span style="color:#f66;font-size:11px;font-weight:bold;">${matDet}</span>`;
-        const res = {isHit: true, jumpFloor: 2, displayHtml: html, specialStyle: "1px solid #f66"};
-        if (p.wantAstar) {
-          const c3 = eng.floors[2].chests[2];
-          const tgt = [{g:2, gx:c3.x, gy:c3.y}];
-          const vals = getWpChestCases(uniSec, wpPartyIdx, wpSoloIdx).map(bx => calcCrossFloorChestRouteCost(eng, 2, bx, tgt));
-          res.astar = minAstar(vals);
-          if (vals.length === 2) res.astarText = `${fmtStepD(vals[0])} / ${fmtStepD(vals[1])}`;
-        }
+        const c3 = eng.floors[2].chests[2];
+        const tgt = [{g:2, gx:c3.x, gy:c3.y}];
+        const vals = getWpChestCases(uniSec, wpPartyIdx, wpSoloIdx).map(bx => calcCrossFloorChestRouteCost(eng, 2, bx, tgt));
+        const res = {isHit: true, jumpFloor: 2, text: `${wpHits.join(' / ')} / ${matDet}`, astar: minAstar(vals)};
+        if (vals.length === 2) res.astarText = `${fmtStepD(vals[0])} / ${fmtStepD(vals[1])}`;
         return res;
       }
       return {isHit:false};
@@ -1516,34 +1250,31 @@ const DUNGEON_CHECKERS = {
     const {valid:b4V, item:pB4, rank:b4Rank} = checkTKThirdChest(eng, 3, checkSec, 20+shift,
       currentB4Targets, p.isMillionaire ? p.strictMatTargets : currentB4Targets);
 
-    if (b3V && b4V) {c2Met = true; matDet = `B3F ${b3Rank}3 ${labelText}: ${dispItem(pB3)}<br>B4F ${b4Rank}3 ${labelText}: ${dispItem(pB4)}`;}
+    if (b3V && b4V) {c2Met = true; matDet = `B3F ${b3Rank}3 ${labelText}: ${dispItem(pB3)} / B4F ${b4Rank}3 ${labelText}: ${dispItem(pB4)}`;}
     else if (b3V) {c1Met = true; matDet = `B3F ${b3Rank}3 ${labelText}: ${dispItem(pB3)}`;}
     else if (b4V) {c1Met = true; matDet = `B4F ${b4Rank}3 ${labelText}: ${dispItem(pB4)}`;}
 
     if (c1Met || c2Met) {
-      let html = `${wpHits.join('<br>')}<br><span style="color:#11F514;font-size:11px">${matDet}</span>`;
-      const res = {isHit: true, jumpFloor: wpFloor, displayHtml: html, specialStyle: c2Met ? "1px solid #fa0" : ""};
-      if (p.wantAstar) {
-        const t3 = b3V ? {g: 2, gx: eng.floors[2].chests[2].x, gy: eng.floors[2].chests[2].y} : null;
-        const t4 = b4V ? {g: 3, gx: eng.floors[3].chests[2].x, gy: eng.floors[3].chests[2].y} : null;
-        const cases = getWpChestCases(uniSec, wpPartyIdx, wpSoloIdx);
-        if (cases.length === 1) {
-          if (c2Met) {
-            const a3 = calcCrossFloorChestRouteCost(eng, wpFloor, cases[0], [t3]);
-            const a4 = calcCrossFloorChestRouteCost(eng, wpFloor, cases[0], [t4]);
-            const ab = calcCrossFloorChestRouteCost(eng, wpFloor, cases[0], [t3, t4]);
-            res.astar = minAstar([a3, a4, ab]);
-            res.astarText = `${fmtStepD(a3)} / ${fmtStepD(a4)} / ${fmtStepD(ab)}`;
-          } else {
-            res.astar = calcCrossFloorChestRouteCost(eng, wpFloor, cases[0], [b3V ? t3 : t4]);
-          }
-        } else if (cases.length === 2) {
-          const vals = cases.map(bx => c2Met
-            ? minAstar([calcCrossFloorChestRouteCost(eng, wpFloor, bx, [t3]), calcCrossFloorChestRouteCost(eng, wpFloor, bx, [t4]), calcCrossFloorChestRouteCost(eng, wpFloor, bx, [t3, t4])])
-            : calcCrossFloorChestRouteCost(eng, wpFloor, bx, [b3V ? t3 : t4]));
-          res.astar = minAstar(vals);
-          res.astarText = `${fmtStepD(vals[0])} / ${fmtStepD(vals[1])}`;
+      const res = {isHit: true, jumpFloor: wpFloor, text: `${wpHits.join(' / ')} / ${matDet}`};
+      const t3 = b3V ? {g: 2, gx: eng.floors[2].chests[2].x, gy: eng.floors[2].chests[2].y} : null;
+      const t4 = b4V ? {g: 3, gx: eng.floors[3].chests[2].x, gy: eng.floors[3].chests[2].y} : null;
+      const cases = getWpChestCases(uniSec, wpPartyIdx, wpSoloIdx);
+      if (cases.length === 1) {
+        if (c2Met) {
+          const a3 = calcCrossFloorChestRouteCost(eng, wpFloor, cases[0], [t3]);
+          const a4 = calcCrossFloorChestRouteCost(eng, wpFloor, cases[0], [t4]);
+          const ab = calcCrossFloorChestRouteCost(eng, wpFloor, cases[0], [t3, t4]);
+          res.astar = minAstar([a3, a4, ab]);
+          res.astarText = `${fmtStepD(a3)} / ${fmtStepD(a4)} / ${fmtStepD(ab)}`;
+        } else {
+          res.astar = calcCrossFloorChestRouteCost(eng, wpFloor, cases[0], [b3V ? t3 : t4]);
         }
+      } else if (cases.length === 2) {
+        const vals = cases.map(bx => c2Met
+          ? minAstar([calcCrossFloorChestRouteCost(eng, wpFloor, bx, [t3]), calcCrossFloorChestRouteCost(eng, wpFloor, bx, [t4]), calcCrossFloorChestRouteCost(eng, wpFloor, bx, [t3, t4])])
+          : calcCrossFloorChestRouteCost(eng, wpFloor, bx, [b3V ? t3 : t4]));
+        res.astar = minAstar(vals);
+        res.astarText = `${fmtStepD(vals[0])} / ${fmtStepD(vals[1])}`;
       }
       return res;
     }
@@ -1552,13 +1283,12 @@ const DUNGEON_CHECKERS = {
 };
 
 return {
-    TreasureMap, MAP_RANK, CHEST_RANK, hex2, resolveRankKey, resetLocationCache,
+    TreasureMap, MAP_RANK, CHEST_RANK, hex, resolveRankKey, resetLocationCache,
     checkUltimateCondsMatch, checkOnlyMonPossible, checkElistAndD, chestCondsMatch,
-    sharedRankFilter, buildOnlyMonExpectedStr,
-    ITEM_BASIC_REQS, DUNGEON_CHECKERS, filterMapRanksBySMRAndChest, getChestRanksForItems,
+    filterRanks, buildOnlyMonExpectedStr,
+    ITEM_BASIC_REQS, DUNGEON_CHECKERS, getChestRanksForItems,
     expandItemGroup, itemName, dispText, b3fThreeItems, ITEMS_MILLIONAIRE, ITEMS_MILLIONAIRE_BOX3, row4, D_C, NO_ROW,
     PREFIX_NAMES, SUFFIX_NAMES, LOCALE_NAMES, ENV_NAMES, BOSS_NAMES, MONSTER_DB, ONLY_MONSTERS,
     LOCATION_SEED_MAX, hasConditionValue, isCombinedElistMonsterSearch, parseLocationCode, parseBaseQuality,
-    listVisitOrders,
 };
 }

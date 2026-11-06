@@ -72,7 +72,6 @@
         routeNone: ['Route: not found.', 'ルートが見つかりませんでした。'],
         routeError: ['Route error: ', 'ルート計算エラー：'],
         routes: ['(routes {0})', '（ルート別：{0}）'],
-        unreachable: ['unreachable', '到達不可'],
     };
     const word = k => TEXT[k] ? TEXT[k][DQ9Lang.index()] : k;
     const fill = (k, ...a) => word(k).replace(/\{(\d)\}/g, (_, i) => a[i]);
@@ -87,13 +86,7 @@
 
         function genFloor(seed, floor1) {
             tkg.generate(seed, floor1);
-            const ctx = tkg.context, hex = ctx.field_0.mapseed, envName = tkg.getEnvironment(hex);
-            const st = tkg.calculateStairsCoords(hex, envName);
-            return Object.assign({ context: ctx }, walk.floorModel({
-                grid: tkg.grid, width: tkg.width, height: tkg.height, bitfield: tkg.bitfield, env: tkg.envIndices[envName],
-                up: st.up, down: st.down, upTile: ctx.upStairs, downTile: ctx.downStairs,
-                chests: tkg.calculateChestCoords(hex, floor1, envName), chestTiles: ctx.field_0._chestCoords || [],
-            }));
+            return Object.assign({ context: tkg.context }, walk.floorModel());
         }
 
         let walkFloor = null;
@@ -106,7 +99,7 @@
                     const cols = fd.points.flatMap((p, k) => p ? [k] : []);
                     tileWalk.setFloorTiles(fd.info);
                     const valid = fd.points.map((p, k) => (k === i && k === 0 && fd.upFront) || p || { x: 0, y: 0 });
-                    const d = tileWalk.shortest(valid, i, cols);
+                    const d = tileWalk.shortest('tiles', { points: valid, src: i, targets: cols });
                     for (const k of cols) row[k] = k === i ? 0 : Math.max(0, d[k] - walk.lbSlack(i, k));
                 }
             }
@@ -136,21 +129,8 @@
             const c = cost(eng.seed, f, i, j, true);
             return c === Infinity ? null : c;
         }
-        const C = DQ9AT_CORE({ tkg, floor: floorOf, calcPointWalkCost: idealPointWalkCost, isOpenTile: walk.isOpenTile });
-
-        function fastestHit(eng, job, seed, r) {
-            const conds = job.conds;
-            if (!C.checkUltimateCondsMatch(eng, seed, r.key, conds, job.searchFilterLoc)) return null;
-            if (job.mode === 'map' && eng.boss === 12 && parseInt(conds.boss) !== 12) return null;
-            if (!C.checkOnlyMonPossible(eng, conds)) return null;
-            eng.loadFloors();
-            if (!C.chestCondsMatch(eng, conds)) return null;
-            const er = C.checkElistAndD(eng, conds, job.onlyMonStr);
-            if (!er.match) return null;
-            let limit = eng.floorCount;
-            if (job.mode === 'floor' && er.jumpToFloor !== -1) limit = Math.min(er.jumpToFloor, limit);
-            return { limit };
-        }
+        const overrides = { tkg, floor: floorOf, calcPointWalkCost: idealPointWalkCost, isOpenTile: walk.isOpenTile };
+        const C = DQ9AT_CORE(overrides);
 
         function fastestCost(seed, limit, bound, known = []) {
             const lb = [], per = [];
@@ -168,31 +148,42 @@
             return { cost: sum, per };
         }
 
-        const plain = html => String(html || '').replace(/<br\s*\/?>/gi, ' / ').replace(/<[^>]*>/g, '')
-            .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
-        const hitText = html => [0, 1].map(L => C.dispText(plain(html), L));
-        const mapMeta = eng => ({ name: [eng.mapName, eng.mapNameJP], type: C.ENV_NAMES[eng.env],
-                                  boss: [eng.bossName, eng.bossNameJP], fc: eng.floorCount });
-        function itemRows(eng, job, seed, r) {
-            const conds = job.conds, p = job.params;
-            const basicReq = C.ITEM_BASIC_REQS[p.checker];
-            if (basicReq && !basicReq(eng, p, conds)) return null;
+        const hitText = text => [0, 1].map(L => C.dispText(text, L));
+        const mapMeta = eng => ({ name: [0, 1].map(L => eng.mapName(L)), type: C.ENV_NAMES[eng.env],
+                                  boss: [0, 1].map(L => eng.bossName(L)), fc: eng.floorCount });
+        function hitOf(eng, job, seed, r) {
+            const conds = job.conds, p = job.params, fastest = job.kind === 'fastest';
+            if (!fastest) {
+                const basicReq = C.ITEM_BASIC_REQS[p.checker];
+                if (basicReq && !basicReq(eng, p, conds)) return null;
+            }
             if (!C.checkUltimateCondsMatch(eng, seed, r.key, conds, job.searchFilterLoc)) return null;
+            if (fastest) {
+                if (job.mode === 'map' && eng.boss === 12 && parseInt(conds.boss) !== 12) return null;
+                if (!C.checkOnlyMonPossible(eng, conds)) return null;
+            }
             eng.loadFloors();
             if (!C.chestCondsMatch(eng, conds)) return null;
+            if (fastest) {
+                const er = C.checkElistAndD(eng, conds, job.onlyMonStr);
+                if (!er.match) return null;
+                let limit = eng.floorCount;
+                if (job.mode === 'floor' && er.jumpToFloor !== -1) limit = Math.min(er.jumpToFloor, limit);
+                return { limit };
+            }
             const hr = C.DUNGEON_CHECKERS[p.checker](eng, p);
             if (!hr || !hr.isHit) return null;
             const rows = hr.multi
-                ? hr.multi.map(row => ({ floor: row.floor, astar: row.astar, astarText: row.astarText, hit: hitText(row.displayHtml),
+                ? hr.multi.map(row => ({ floor: row.floor, astar: row.astar, astarText: row.astarText, hit: hitText(row.text),
                                          isB10: !!row.isB10, isJfireB10: !!row.isJfireB10, isX3: !!row.isX3 }))
-                : [{ floor: hr.jumpFloor || 0, astar: hr.astar, astarText: hr.astarText, hit: hitText(hr.displayHtml), isX3: !!hr.astarX3 }];
+                : [{ floor: hr.jumpFloor || 0, astar: hr.astar, astarText: hr.astarText, hit: hitText(hr.text), isX3: !!hr.astarX3 }];
             return rows.map(row => Object.assign(row, { cost: row.astar == null ? Infinity : row.astar }));
         }
 
         async function runJob(job) {
             if (job.kind === 'fastest') job.onlyMonStr = C.buildOnlyMonExpectedStr(job.conds);
             const topN = job.topN;
-            const ranks = job.ranks.map((rank, ri) => ({ rank, ri, rStr: C.hex2(rank), key: C.resolveRankKey(C.hex2(rank), rank) }));
+            const ranks = job.ranks.map((rank, ri) => ({ rank, ri, rStr: C.hex(rank, 2), key: C.resolveRankKey(C.hex(rank, 2), rank) }));
             let processed = 0, hits = 0, lastPost = Date.now();
             const top = [];
             const bound = () => Math.min(job.bound, top.length >= topN ? top[top.length - 1].cost : Infinity);
@@ -210,7 +201,7 @@
                     C.resetLocationCache();
                     const base = { seed, rank: r.rank, rStr: r.rStr, ord: r.ri * 0x10000 + seed };
                     if (job.kind === 'fastest') {
-                        const hit = fastestHit(eng, job, seed, r);
+                        const hit = hitOf(eng, job, seed, r);
                         if (!hit) continue;
                         hits++;
                         const meta = mapMeta(eng);
@@ -224,7 +215,7 @@
                         if (res.cost === null) continue;
                         insert(Object.assign(base, meta, { cost: res.cost, per: res.per }));
                     } else {
-                        const rows = itemRows(eng, job, seed, r);
+                        const rows = hitOf(eng, job, seed, r);
                         if (!rows) continue;
                         hits++;
                         const meta = mapMeta(eng);
@@ -241,7 +232,7 @@
         }
 
         let captured = [];
-        const CR = DQ9AT_CORE({ tkg, floor: floorOf, calcPointWalkCost: idealPointWalkCost, isOpenTile: walk.isOpenTile, onRoute: w => captured.push(w) });
+        const CR = DQ9AT_CORE(Object.assign({ onRoute: w => captured.push(w) }, overrides));
         function routeOf(job, item) {
             let legs;
             if (job.kind === 'fastest') {
@@ -296,13 +287,7 @@
         const text = script ? script.textContent : '';
         const cut = text.indexOf('function drawOverlapCanvas(');
         if (cut < 0) throw new Error("TKG generator not found in index.html");
-        return `function TKG_GEN() {\n${text.slice(0, cut)}\nreturn {
-    generate: (seed, floor1) => FUN_02090444(seed, floor1),
-    get grid() { return mapGrid; }, get width() { return mapWidth; }, get height() { return mapHeight; },
-    get bitfield() { return bitfieldGrid; }, get context() { return mapContext; },
-    getEnvironment, envIndices, calculateStairsCoords, calculateChestCoords, LCG,
-    tileMap, TILE_WALL, TILE_DIVIDER,
-};\n}\n`;
+        return `function TKG_GEN() {\n${text.slice(0, cut)}\nreturn (${tkgApi})();\n}\n`;
     }
 
     let runtimeSource = null;
@@ -355,92 +340,81 @@
     }
 
     const CHUNKS_PER_WORKER = 12, CHUNK_MIN = 16, CHUNK_MAX = 1024;
+    const byCost = (x, y) => x.cost - y.cost || x.ord - y.ord;
+    const nthCost = (list, n) => list.length >= n ? list[n - 1].cost : Infinity;
+    const keepTop = (list, more, n) => list.concat(more).sort(byCost).slice(0, n);
+    const TIE = 1e-9;
     function runJob(job, onProgress) {
-        const p = getPool(), gen = ++runGen;
+        const p = getPool(), ranking = job.kind === 'fastest' && job.topN < Infinity;
+        const scan = ranking ? Object.assign({}, job, { lowerBounds: true, topN: Infinity }) : job;
         const span = job.endSeed - job.startSeed + 1, total = span * job.ranks.length;
         const size = Math.max(CHUNK_MIN, Math.min(CHUNK_MAX, Math.ceil(span / (p.rts.length * CHUNKS_PER_WORKER))));
         const queue = [];
         for (let a = job.startSeed; a <= job.endSeed; a += size) queue.push([a, Math.min(job.endSeed, a + size - 1)]);
-        const busy = new Map();
-        let top = [], processed = 0, hits = 0, stopped = false, resolve, reject;
+        const busy = new Map(), walked = new Map(), workers = p.rts[0].worker ? p.rts.length : 0;
+        let gen = ++runGen, top = [], processed = 0, hits = 0, stopped = false, cands = null, next = 0, resolve, reject;
         const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
-        const bound = () => top.length >= job.topN ? top[job.topN - 1].cost : Infinity;
+        const bound = () => cands ? nthCost(top, job.topN) + TIE : nthCost(top, scan.topN);
+        const cancelBusy = () => busy.forEach((_, j) => p.rts[j].post({ type: 'cancel' }));
         const report = () => {
             let hot = 0, h = 0;
             for (const b of busy.values()) { hot += b.processed; h += b.hits; }
             onProgress({ processed: processed + hot, hits: hits + h }, total);
         };
-        const finish = () => { p.run = null; resolve({ items: top, processed, hits, workers: p.rts[0].worker ? p.rts.length : 0 }); };
+        const known = c => walked.get(c.seed) || [];
+        const add = (c, per, cost) => { top = keepTop(top, [Object.assign({}, c, { cost, per: per.slice(0, c.lbs.length), lbs: undefined })], job.topN); };
+        const done = () => stopped || next >= cands.length || cands[next].cost > bound();
         const dispatch = () => {
-            while (!stopped && queue.length && p.idle.length) {
-                const i = p.idle.shift(), [a, b] = queue.shift();
-                busy.set(i, { processed: 0, hits: 0 });
-                p.rts[i].post({ type: 'run', job: Object.assign({}, job, { startSeed: a, endSeed: b, gen, bound: bound() }) });
+            if (!cands) {
+                while (!stopped && queue.length && p.idle.length) {
+                    const i = p.idle.shift(), [a, b] = queue.shift();
+                    busy.set(i, { processed: 0, hits: 0 });
+                    p.rts[i].post({ type: 'run', job: Object.assign({}, scan, { startSeed: a, endSeed: b, gen, bound: bound() }) });
+                }
+                if (busy.size || !(stopped || !queue.length)) return;
+                if (!ranking) { p.run = null; resolve({ items: top, processed, hits, workers }); return; }
+                cands = top; top = []; stopped = false; gen = ++runGen;
             }
-            if (!busy.size && (stopped || !queue.length)) finish();
+            while (!done() && p.idle.length) {
+                const c = cands[next++], k = known(c), sum = c.lbs.reduce((a, lb, f) => a + (k[f] ?? lb), 0);
+                if (sum === Infinity || sum > bound()) continue;
+                if (c.lbs.every((_, f) => k[f] !== undefined)) { add(c, k, sum); continue; }
+                const i = p.idle.shift();
+                busy.set(i, c);
+                p.rts[i].post({ type: 'exact', gen, seed: c.seed, limit: c.lbs.length, bound: bound(), known: k });
+            }
+            if (!busy.size && done()) { p.run = null; resolve({ items: top, hits, workers }); }
         };
         p.run = (i, m) => {
             if (m.gen !== undefined && m.gen !== gen) { if (FREES.includes(m.type)) dispatch(); return; }
             if (m.type === 'error') {
                 stopped = true;
-                busy.forEach((_, j) => p.rts[j].post({ type: 'cancel' }));
+                if (!cands) cancelBusy();
                 p.run = null;
                 reject(new Error(m.message));
                 return;
             }
             if (!busy.has(i)) return;
             if (m.type === 'progress') { busy.set(i, m); report(); return; }
-            if (m.type !== 'done') return;
-            busy.delete(i);
-            processed += m.processed;
-            hits += m.hits;
-            top = top.concat(m.items).sort(byCost).slice(0, job.topN);
-            report();
-            dispatch();
-        };
-        dispatch();
-        return { promise, cancel: () => { stopped = true; busy.forEach((_, j) => p.rts[j].post({ type: 'cancel' })); } };
-    }
-
-    const byCost = (x, y) => x.cost - y.cost || x.ord - y.ord;
-    const TIE = 1e-9;
-    function runFastestMap(job, onProgress) {
-        let stopped = false, stage = runJob(Object.assign({}, job, { lowerBounds: true, topN: Infinity }), onProgress);
-        const promise = stage.promise.then(first => new Promise((resolve, reject) => {
-            const p = getPool(), gen = ++runGen, cands = first.items, busy = new Map(), walked = new Map();
-            let next = 0, top = [];
-            const bound = () => (top.length >= job.topN ? top[job.topN - 1].cost : Infinity) + TIE;
-            const known = c => walked.get(c.seed) || [];
-            const add = (c, per, cost) => { top = top.concat([Object.assign({}, c, { cost, per: per.slice(0, c.lbs.length), lbs: undefined })]).sort(byCost).slice(0, job.topN); };
-            const done = () => stopped || next >= cands.length || cands[next].cost > bound();
-            const dispatch = () => {
-                while (!done() && p.idle.length) {
-                    const c = cands[next++], k = known(c), sum = c.lbs.reduce((a, lb, f) => a + (k[f] ?? lb), 0);
-                    if (sum === Infinity || sum > bound()) continue;
-                    if (c.lbs.every((_, f) => k[f] !== undefined)) { add(c, k, sum); continue; }
-                    const i = p.idle.shift();
-                    busy.set(i, c);
-                    p.rts[i].post({ type: 'exact', gen, seed: c.seed, limit: c.lbs.length, bound: bound(), known: k });
-                }
-                if (!busy.size && done()) { p.run = null; resolve({ items: top, hits: first.hits, workers: first.workers }); }
-            };
-            p.run = (i, m) => {
-                if (m.gen !== undefined && m.gen !== gen) { if (FREES.includes(m.type)) dispatch(); return; }
-                if (m.type === 'error') { stopped = true; p.run = null; reject(new Error(m.message)); return; }
-                if (m.type !== 'exact' || !busy.has(i)) return;
+            if (m.type === 'done') {
+                busy.delete(i);
+                processed += m.processed;
+                hits += m.hits;
+                top = keepTop(top, m.items, scan.topN);
+                report();
+            } else if (m.type === 'exact') {
                 const c = busy.get(i), k = known(c).slice();
                 busy.delete(i);
                 m.res.per.forEach((v, f) => { if (v !== undefined && v !== null) k[f] = v; });
                 walked.set(c.seed, k);
                 if (m.res.cost !== null) add(c, m.res.per, m.res.cost);
                 const nums = [walked.size, next, cands.length];
-                onProgress({ processed: 1, hits: first.hits, text: () => fill('ranking', ...nums) }, 1);
-                dispatch();
-            };
-            stage = { cancel: () => { stopped = true; } };
+                onProgress({ processed: 1, hits, text: () => fill('ranking', ...nums) }, 1);
+            } else return;
             dispatch();
-        }));
-        return { promise, cancel: () => stage.cancel() };
+        };
+        dispatch();
+        return { promise, cancel: () => { stopped = true; if (!cands) cancelBusy(); } };
     }
 
     let core = null;
@@ -462,7 +436,7 @@
         return conds;
     }
 
-    function baseJob(conds, filterRanks) {
+    function baseJob(conds, filterRanks, extra) {
         const C = getCore();
         const loc = C.parseLocationCode(conds.location), bq = C.parseBaseQuality(conds.bq);
         if (Number.isNaN(loc) || Number.isNaN(bq)) { setStatus(() => word('B07')); return null; }
@@ -479,7 +453,7 @@
         let ranks = checked('srchAllRanks') ? C.MAP_RANK.slice() : [parseInt(val('srchRank'), 16)];
         ranks = filterRanks(ranks, conds);
         if (!ranks.length) { setStatus(() => word('B08')); return null; }
-        return { conds, ranks, startSeed, endSeed, searchFilterLoc };
+        return Object.assign({ conds, ranks, startSeed, endSeed, searchFilterLoc }, extra);
     }
 
     function fastestJob() {
@@ -488,43 +462,35 @@
         if (conds.elist === 'MULTI_SPECIAL') { alert(word('A13')); return null; }
         const mode = (conds.elist || conds.onlyMon) ? 'floor' : 'map';
         if (mode === 'map' && !(conds.depth || conds.lv || conds.elist || conds.onlyMon || conds.location || conds.boss)) { alert(word('A14')); return null; }
-        const job = baseJob(conds, C.sharedRankFilter);
-        if (!job) return null;
-        return Object.assign(job, { kind: 'fastest', mode, topN: mode === 'floor' ? Infinity : 50 });
+        return baseJob(conds, C.filterRanks, { kind: 'fastest', mode, topN: mode === 'floor' ? Infinity : 50 });
     }
 
     const qlSec = () => ({ D: null, '5D': 0, '9D': 4 })[val('srchQlMode')];
     const itemGroup = () => { const o = document.getElementById('srchItem').selectedOptions[0]; return o ? o.parentElement.dataset.group : ''; };
     function itemJob(checker, filterRanks, params, preset) {
-        const job = baseJob(getConds(), filterRanks);
-        if (!job) return null;
-        return Object.assign(job, { kind: 'item', params: Object.assign({ checker }, params), topN: Infinity, preset: preset || {} });
+        return baseJob(getConds(), filterRanks, { kind: 'item', params: Object.assign({ checker }, params), topN: Infinity, preset: preset || {} });
     }
     function quickloadTarget() {
         const C = getCore(), targetItem = val('srchItem'), isB9F = itemGroup() === 'ogS';
         if (itemGroup() === 'og5') { alert(word('A03')); return null; }
         const checkItems = C.expandItemGroup(targetItem);
         const isThree = C.b3fThreeItems.includes(targetItem);
-        return { targetItem, isB9F, checkItems, reqCount: isB9F ? 2 : isThree ? 3 : 2, targetFloors: isB9F ? [8] : isThree ? [2] : [2, 3] };
+        return { isB9F, checkItems, reqCount: isB9F ? 2 : isThree ? 3 : 2, targetFloors: isThree ? [2] : [2, 3] };
     }
     function qlJob() {
         const C = getCore(), t = quickloadTarget();
         if (!t) return null;
         const chestRanks = C.getChestRanksForItems(t.checkItems);
-        const filter = (ranks, conds) => C.filterMapRanksBySMRAndChest(ranks, conds, [chestRanks], t.isB9F ? 2 : 0);
+        const filter = (ranks, conds) => C.filterRanks(ranks, conds, [chestRanks], t.isB9F ? 2 : 0);
         const preset = { b9Rows: t.isB9F, x3Count: t.reqCount + 1 };
-        if (val('srchQlMode') === 'D') {
-            return itemJob('quickload', filter, { targetFloors: t.targetFloors, checkItems: t.checkItems, reqCount: t.reqCount, isB9F: t.isB9F,
-                                                  chestRanks, wantAstar: true, checkB10: t.isB9F }, preset);
-        }
-        return itemJob('quickload9', filter, { targetFloors: t.targetFloors, checkItems: t.checkItems, reqCount: t.reqCount, isB9F: t.isB9F,
-                                               chestRanks, qlSec: qlSec(), wantAstar: true, checkB10: t.isB9F }, preset);
+        return itemJob(val('srchQlMode') === 'D' ? 'quickload' : 'quickload9', filter,
+                       { targetFloors: t.targetFloors, checkItems: t.checkItems, reqCount: t.reqCount, isB9F: t.isB9F, chestRanks, qlSec: qlSec() }, preset);
     }
     function comboJob() {
         const C = getCore(), targetItem = val('srchItem'), sec = qlSec();
         if (targetItem === 'Sainted soma') {
             return itemJob('jfire', ranks => ranks.filter(rank => C.row4(C.D_C, 8, rank, C.NO_ROW)[1] >= 9),
-                           { qlSec: sec, wantAstar: true }, { jfire: true });
+                           { qlSec: sec }, { jfire: true });
         }
         let wpTargets, strictMatTargets, broadMatTargets = [], isMillionaire = false, isMonsterBox = false, minSec = 0, maxSec = 0;
         if (targetItem === 'Millionaire') {
@@ -543,8 +509,8 @@
         else if (targetItem === "Sorcerer's stone") { wpTargets = ["Sorcerer's stone"]; strictMatTargets = ['670G']; }
         else { alert(word('A05')); return null; }
         const allMatTargets = isMillionaire ? broadMatTargets : strictMatTargets;
-        return itemJob('tk', (ranks, conds) => C.filterMapRanksBySMRAndChest(ranks, conds, [C.getChestRanksForItems(wpTargets), C.getChestRanksForItems(allMatTargets)], 0),
-                       { targetItem, wpTargets, strictMatTargets, broadMatTargets, isMillionaire, isMonsterBox, minSec, maxSec, qlSec: sec, wantAstar: true });
+        return itemJob('tk', (ranks, conds) => C.filterRanks(ranks, conds, [C.getChestRanksForItems(wpTargets), C.getChestRanksForItems(allMatTargets)], 0),
+                       { targetItem, wpTargets, strictMatTargets, broadMatTargets, isMillionaire, isMonsterBox, minSec, maxSec, qlSec: sec });
     }
     function thirdJob() {
         const C = getCore(), targetValue = val('srchItem');
@@ -553,8 +519,8 @@
         const checkItems = isS3 ? ["Sage's elixir", 'Sainted soma'] : targetValue === 'Millionaire' ? C.ITEMS_MILLIONAIRE_BOX3 : [targetValue];
         const targetFloors = isS3 ? [12, 13] : [2, 3];
         const chestRanks = isS3 ? [10] : C.getChestRanksForItems(checkItems);
-        return itemJob('third', (ranks, conds) => C.filterMapRanksBySMRAndChest(ranks, conds, [chestRanks], isS3 ? 3 : 0),
-                       { targetFloors, checkItems, isS3, chestRanks, wantAstar: true });
+        return itemJob('third', (ranks, conds) => C.filterRanks(ranks, conds, [chestRanks], isS3 ? 3 : 0),
+                       { targetFloors, checkItems, isS3, chestRanks });
     }
 
     function shapeItems(items, preset) {
@@ -612,7 +578,7 @@
         document.body.appendChild(style);
 
         const opts = list => list.map(([v, t]) => `<option value="${v}"${wordAttr(t)}>${word(t)}</option>`).join('');
-        const named = (obj, i1, i2) => Object.keys(obj).map(k => [k, `${obj[k][i1]} ${obj[k][i2]}`]);
+        const named = obj => Object.keys(obj).map(k => [k, obj[k].join(' ')]);
         const sel = (id, list) => `<select id="${id}"><option value="">------</option>${opts(list)}</select>`;
         const label = (k, id) => `<label for="${id}"${wordAttr(k)}>${word(k)}</label>`;
         const field = (k, id, html) => `<span>${label(k, id)}${html}</span>`;
@@ -625,7 +591,7 @@
         ['0B5', '01B', '0B9'].forEach(id => onlyMon.push(monOpt(id)));
         [1, 2, 3, 4, 5].forEach(env => C.ONLY_MONSTERS[env].forEach(id => { if (id && !seen.has(id)) { seen.add(id); onlyMon.push(monOpt(id)); } }));
 
-        const rankOpts = C.MAP_RANK.map(r => [C.hex2(r), C.hex2(r)]);
+        const rankOpts = C.MAP_RANK.map(r => [C.hex(r, 2), C.hex(r, 2)]);
         const boxes = [];
         for (let r = 10; r >= 1; r--) boxes.push(`<label>${C.CHEST_RANK[r]} <input type="number" class="srch-box" id="srchBox${C.CHEST_RANK[r]}" min="0" max="40"></label>`);
         const items = Object.entries(ITEM_GROUPS).map(([g, list]) =>
@@ -642,16 +608,16 @@
             </div>
             <div class="srch-head">Ultimate Search</div>
             <div class="srch-grid">
-                ${cell('G03', 'srchPrefix', sel('srchPrefix', named(C.PREFIX_NAMES, 0, 1)))}
-                ${cell('G04', 'srchSuffix', sel('srchSuffix', named(C.SUFFIX_NAMES, 0, 1)))}
-                ${cell('G05', 'srchLocale', sel('srchLocale', named(C.LOCALE_NAMES, 0, 1)))}
-                ${cell('C02', 'srchEnv', sel('srchEnv', named(C.ENV_NAMES, 0, 1)))}
+                ${cell('G03', 'srchPrefix', sel('srchPrefix', named(C.PREFIX_NAMES)))}
+                ${cell('G04', 'srchSuffix', sel('srchSuffix', named(C.SUFFIX_NAMES)))}
+                ${cell('G05', 'srchLocale', sel('srchLocale', named(C.LOCALE_NAMES)))}
+                ${cell('C02', 'srchEnv', sel('srchEnv', named(C.ENV_NAMES)))}
                 ${cell('Lv', 'srchLv', num('srchLv', 1, 99))}
                 ${cell('C03', 'srchMonster', num('srchMonster', 1, 9))}
                 ${cell('G10', 'srchDepth', num('srchDepth', 2, 16))}
                 ${cell('G06', 'srchLocation', '<input type="text" class="srch-hex" id="srchLocation" maxlength="2" placeholder="96">')}
                 ${cell('GBQ', 'srchBq', num('srchBq', 2, 248))}
-                ${cell('BOSS', 'srchBoss', sel('srchBoss', named(C.BOSS_NAMES, 0, 2)))}
+                ${cell('BOSS', 'srchBoss', sel('srchBoss', named(C.BOSS_NAMES)))}
                 ${cell('G12', 'srchElist', sel('srchElist', ELIST_OPTIONS))}
                 ${cell('G13', 'srchOnlyMon', sel('srchOnlyMon', onlyMon))}
             </div>
@@ -691,7 +657,7 @@
                 document.getElementById("srchResults").innerHTML = "";
                 btn.classList.add("running");
                 const t0 = Date.now();
-                running = (job.kind === 'fastest' && job.topN < Infinity ? runFastestMap : runJob)(job,
+                running = runJob(job,
                     (p, total) => setStatus(() => p.text ? p.text() : fill('progress', Math.floor(p.processed / total * 100), `${p.hits} ${word('B03')}`)));
                 running.btn = btn;
                 running.promise.then(res => {
@@ -700,7 +666,7 @@
                     const n = res.workers;
                     setStatus(() => fill('done', `${res.hits} ${word('B03')}`, secs, n ? fill(n > 1 ? 'workers' : 'worker', n) : word('mainThread')));
                     shown = { job, items };
-                    if (job.kind === 'item') renderItemResults(items); else renderFastestResults(items);
+                    renderResults(items, job.kind);
                 }).catch(err => setStatus(() => fill('error', err.message)))
                   .finally(() => { running = null; btn.classList.remove("running"); });
             });
@@ -783,29 +749,24 @@
         if (map) map.scrollIntoView({ behavior: 'smooth' });
     }
 
-    const hex4 = s => s.toString(16).toUpperCase().padStart(4, '0');
-    const fmt = c => c === Infinity ? word('unreachable') : c.toFixed(3);
+    const fmt = c => window.DQ9Distance.fmt(c, 3);
 
-    function renderFastestResults(items) {
-        const head = `<tr><th>#</th><th>Seed</th><th>Rank</th><th class="srch-left"${wordAttr('C01')}>${word('C01')}</th><th class="srch-left"${wordAttr('C02')}>${word('C02')}</th><th class="srch-left">Boss</th><th${wordAttr('C04')}>${word('C04')}</th><th${wordAttr('steps')}>${word('steps')}</th></tr>`;
-        const rows = items.map((it, i) => {
-            const per = it.per.map((c, f) => `B${f + 1}F ${c.toFixed(2)}`).join(' / ');
-            return `<tr class="srch-pick" data-i="${i}" data-seed="${hex4(it.seed)}" title="${word('showRoute')}">` +
-                   `<td>${i + 1}</td><td>${hex4(it.seed)}</td><td>${it.rStr}</td>${textCell(it, 'name', 'srch-left')}` +
-                   `${textCell(it, 'type', 'srch-left')}${textCell(it, 'boss', 'srch-left')}<td>${it.fc}</td>` +
-                   `<td><b data-t="cost">${cellText(it, 'cost')}</b><span class="tip" tabindex="0" data-tip="${per}">ⓘ</span></td></tr>`;
-        }).join("");
-        document.getElementById("srchResults").innerHTML = items.length ? head + rows : "";
-    }
-
-    function renderItemResults(items) {
-        const head = `<tr><th>#</th><th>Seed</th><th>Rank</th><th class="srch-left"${wordAttr('C01')}>${word('C01')}</th><th${wordAttr('C04')}>${word('C04')}</th><th${wordAttr('steps')}>${word('steps')}</th><th class="srch-left"${wordAttr('hit')}>${word('hit')}</th></tr>`;
+    function renderResults(items, kind) {
+        const C = getCore(), fastest = kind === 'fastest';
+        const head = `<tr><th>#</th><th>Seed</th><th>Rank</th><th class="srch-left"${wordAttr('C01')}>${word('C01')}</th>` +
+            (fastest ? `<th class="srch-left"${wordAttr('C02')}>${word('C02')}</th><th class="srch-left">Boss</th>` : '') +
+            `<th${wordAttr('C04')}>${word('C04')}</th><th${wordAttr('steps')}>${word('steps')}</th>` +
+            (fastest ? '' : `<th class="srch-left"${wordAttr('hit')}>${word('hit')}</th>`) + `</tr>`;
         let n = 0;
         const rows = items.map((it, i) => {
             if (it.header) return `<tr><td colspan="7" class="srch-left"><b>${it.header}</b></td></tr>`;
-            return `<tr class="srch-pick" data-i="${i}" data-seed="${hex4(it.seed)}" title="${word('showRoute')}">` +
-                   `<td>${++n}</td><td>${hex4(it.seed)}</td><td>${it.rStr}</td>${textCell(it, 'name', 'srch-left')}<td>${it.fc}</td>` +
-                   `<td><b data-t="cost">${cellText(it, 'cost')}</b></td>${textCell(it, 'hit', 'srch-floors')}</tr>`;
+            const seed = C.hex(it.seed, 4);
+            const tip = fastest ? `<span class="tip" tabindex="0" data-tip="${it.per.map((c, f) => `B${f + 1}F ${c.toFixed(2)}`).join(' / ')}">ⓘ</span>` : '';
+            return `<tr class="srch-pick" data-i="${i}" data-seed="${seed}" title="${word('showRoute')}">` +
+                   `<td>${++n}</td><td>${seed}</td><td>${it.rStr}</td>${textCell(it, 'name', 'srch-left')}` +
+                   (fastest ? `${textCell(it, 'type', 'srch-left')}${textCell(it, 'boss', 'srch-left')}` : '') +
+                   `<td>${it.fc}</td><td><b data-t="cost">${cellText(it, 'cost')}</b>${tip}</td>` +
+                   (fastest ? '' : textCell(it, 'hit', 'srch-floors')) + `</tr>`;
         }).join("");
         document.getElementById("srchResults").innerHTML = items.length ? head + rows : "";
     }
