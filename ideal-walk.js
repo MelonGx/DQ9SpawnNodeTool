@@ -32,20 +32,20 @@ function createIdealWalk(px = 16, tkg) {
     const octile = (dx, dy) => octileSteps(dx, dy) / TILE;
 
     function makeHeap(tie) {
-        const ties = tie !== undefined;
-        let key = new Float64Array(1024), val = ties ? [] : new Int32Array(1024), n = 0;
+        const ties = tie !== undefined, items = [], spare = [];
+        let key = new Float64Array(1024), val = new Int32Array(1024), n = 0;
         return {
             get size() { return n; },
             push(k, v) {
+                if (ties) { const s = spare.length ? spare.pop() : items.length; items[s] = v; v = s; }
                 if (n === key.length) {
-                    const k2 = new Float64Array(2 * n);
-                    k2.set(key); key = k2;
-                    if (!ties) { const v2 = new Int32Array(2 * n); v2.set(val); val = v2; }
+                    const k2 = new Float64Array(2 * n), v2 = new Int32Array(2 * n);
+                    k2.set(key); v2.set(val); key = k2; val = v2;
                 }
                 let i = n++;
                 while (i > 0) {
                     const p = (i - 1) >> 1;
-                    if (!(k < key[p] || (ties && k === key[p] && tie(v, val[p])))) break;
+                    if (!(k < key[p] || (ties && k === key[p] && tie(items[v], items[val[p]])))) break;
                     key[i] = key[p]; val[i] = val[p]; i = p;
                 }
                 key[i] = k; val[i] = v;
@@ -56,12 +56,15 @@ function createIdealWalk(px = 16, tkg) {
                 for (;;) {
                     let c = 2 * i + 1;
                     if (c >= n) break;
-                    if (c + 1 < n && (key[c + 1] < key[c] || (ties && key[c + 1] === key[c] && tie(val[c + 1], val[c])))) c++;
-                    if (!(key[c] < k || (ties && key[c] === k && tie(val[c], v)))) break;
+                    if (c + 1 < n && (key[c + 1] < key[c] || (ties && key[c + 1] === key[c] && tie(items[val[c + 1]], items[val[c]])))) c++;
+                    if (!(key[c] < k || (ties && key[c] === k && tie(items[val[c]], items[v])))) break;
                     key[i] = key[c]; val[i] = val[c]; i = c;
                 }
                 key[i] = k; val[i] = v;
-                return top;
+                if (!ties) return top;
+                const e = items[top];
+                items[top] = undefined; spare.push(top);
+                return e;
             },
             drain() { const out = val.slice(0, n); n = 0; return out; },
             clear() { n = 0; },
