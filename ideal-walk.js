@@ -31,38 +31,40 @@ function createIdealWalk(px = 16, tkg) {
     }
     const octile = (dx, dy) => octileSteps(dx, dy) / TILE;
 
-    function makeHeap(less = (a, b) => a < b) {
-        const key = [], val = [];
+    function makeHeap(tie) {
+        const ties = tie !== undefined;
+        let key = new Float64Array(1024), val = ties ? [] : new Int32Array(1024), n = 0;
         return {
-            get size() { return key.length; },
-            push(k, v = k) {
-                let i = key.length;
-                key.push(k); val.push(v);
+            get size() { return n; },
+            push(k, v) {
+                if (n === key.length) {
+                    const k2 = new Float64Array(2 * n);
+                    k2.set(key); key = k2;
+                    if (!ties) { const v2 = new Int32Array(2 * n); v2.set(val); val = v2; }
+                }
+                let i = n++;
                 while (i > 0) {
                     const p = (i - 1) >> 1;
-                    if (!less(k, key[p])) break;
+                    if (!(k < key[p] || (ties && k === key[p] && tie(v, val[p])))) break;
                     key[i] = key[p]; val[i] = val[p]; i = p;
                 }
                 key[i] = k; val[i] = v;
             },
             pop() {
-                const top = val[0], k = key.pop(), v = val.pop(), n = key.length;
-                if (n) {
-                    let i = 0;
-                    for (;;) {
-                        const l = 2 * i + 1, r = l + 1;
-                        let m = i, mk = k;
-                        if (l < n && less(key[l], mk)) { m = l; mk = key[l]; }
-                        if (r < n && less(key[r], mk)) m = r;
-                        if (m === i) break;
-                        key[i] = key[m]; val[i] = val[m]; i = m;
-                    }
-                    key[i] = k; val[i] = v;
+                const top = val[0], k = key[--n], v = val[n];
+                let i = 0;
+                for (;;) {
+                    let c = 2 * i + 1;
+                    if (c >= n) break;
+                    if (c + 1 < n && (key[c + 1] < key[c] || (ties && key[c + 1] === key[c] && tie(val[c + 1], val[c])))) c++;
+                    if (!(key[c] < k || (ties && key[c] === k && tie(val[c], v)))) break;
+                    key[i] = key[c]; val[i] = val[c]; i = c;
                 }
+                key[i] = k; val[i] = v;
                 return top;
             },
-            drain() { key.length = 0; return val.splice(0); },
-            clear() { key.length = 0; val.length = 0; },
+            drain() { const out = val.slice(0, n); n = 0; return out; },
+            clear() { n = 0; },
         };
     }
     const keyHeap = makeHeap();
@@ -322,34 +324,16 @@ function createIdealWalk(px = 16, tkg) {
     const MOVES = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
 
     function shortest(kind, o) {
-        let n, starts, h, settle, expand, rest = () => 0, done = () => false, result, g, c, closed;
-        if (kind === 'tiles') {
-            const nodes = o.points.map(p => ({ x: p.x, y: p.y, q: null })).concat(floorCorners());
-            const left = new Set(o.targets.filter(t => t !== o.src));
+        const tiles = kind === 'tiles', thin = kind === 'thin', W = freeW;
+        let n, nodes, left, goalOf, boxes, aim, res, found = Infinity;
+        if (tiles) {
+            nodes = o.points.map(p => ({ x: p.x, y: p.y, q: null })).concat(floorCorners());
+            left = new Set(o.targets.filter(t => t !== o.src));
             n = nodes.length;
-            starts = [[o.src, 0]];
-            h = v => {
-                let best = Infinity;
-                for (const t of left) best = Math.min(best, octile(nodes[t].x - nodes[v].x, nodes[t].y - nodes[v].y));
-                return best === Infinity ? 0 : best;
-            };
-            done = () => !left.size;
-            settle = u => left.delete(u) ? 1 : 0;
-            expand = u => {
-                const a = nodes[u];
-                for (let v = 0; v < n; v++) {
-                    if (closed[v]) continue;
-                    const b = nodes[v], dx = b.x - a.x, dy = b.y - a.y;
-                    if (!tangentAt(a, dx, dy) || !tangentAt(b, dx, dy)) continue;
-                    const gv = g[u] + octile(dx, dy);
-                    if (gv >= g[v]) continue;
-                    if (!segmentClear(a, b)) continue;
-                    relax(v, 0, gv);
-                }
-            };
-            result = () => g;
-        } else if (kind === 'grid') {
-            const W = freeW, res = o.targets.map(() => Infinity), goalOf = new Map(), boxes = [];
+        } else if (thin) {
+            n = o.n;
+        } else {
+            res = o.targets.map(() => Infinity); goalOf = new Map(); boxes = [];
             o.targets.forEach((t, k) => {
                 const b = { k, x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity };
                 for (const cell of o.goals(t)) {
@@ -360,65 +344,69 @@ function createIdealWalk(px = 16, tkg) {
                 }
                 if (b.x0 <= b.x1) boxes.push(b);
             });
-            const left = new Set(goalOf.keys());
-            let aim = boxes;
+            left = new Set(goalOf.keys());
+            aim = boxes;
             n = W * freeH;
-            starts = o.starts.map(s => [s, 0]);
-            h = cell => {
-                let best = Infinity;
-                const cx = cell % W, cy = (cell / W) | 0;
-                for (const b of aim) best = Math.min(best, octileSteps(Math.max(0, b.x0 - cx, cx - b.x1), Math.max(0, b.y0 - cy, cy - b.y1)));
-                return best === Infinity ? 0 : best;
-            };
-            done = () => !left.size;
-            settle = u => {
-                if (!left.has(u)) return 0;
-                for (const k of goalOf.get(u)) if (res[k] === Infinity) res[k] = g[u] / GRID;
-                for (const [cell, ks] of goalOf) if (left.has(cell) && ks.every(k => res[k] < Infinity)) left.delete(cell);
-                aim = boxes.filter(b => res[b.k] === Infinity);
-                return 2;
-            };
-            expand = u => {
-                for (const [ox, oy] of MOVES) {
-                    const v = o.step(u, ox, oy);
-                    if (v >= 0) relax(v, 0, g[u] + (ox && oy ? Math.SQRT2 : 1));
-                }
-            };
-            result = () => res;
-        } else {
-            let found = Infinity;
-            n = o.n;
-            starts = o.starts.map(s => [s >> 1, s & 1]);
-            h = o.h;
-            rest = u => o.rest[u];
-            settle = u => { if (!o.goal[u]) return 0; found = g[u] / GRID; return 3; };
-            expand = u => {
-                for (let d = 0; d < 8; d++) {
-                    const r = o.move(u, d);
-                    if (r >= 0) relax(r >> 1, c[u] + (r & 1), g[u] + (MOVES[d][0] && MOVES[d][1] ? Math.SQRT2 : 1));
-                }
-            };
-            result = () => found;
         }
-        g = new Float64Array(n).fill(Infinity); c = new Float64Array(n).fill(Infinity); closed = new Uint8Array(n);
+        const g = new Float64Array(n).fill(Infinity), c = thin ? new Float64Array(n).fill(Infinity) : null, closed = new Uint8Array(n);
         const BIG = 4 * n, heap = keyHeap;
-        const key = v => (c[v] + rest(v)) * BIG + g[v] + h(v);
-        const relax = (v, c1, g1) => { if (rest(v) >= 0 && (c1 < c[v] || (c1 === c[v] && g1 < g[v]))) { c[v] = c1; g[v] = g1; heap.push(key(v), v); } };
+        const h = v => {
+            if (thin) return o.h(v);
+            let best = Infinity;
+            if (tiles) for (const t of left) best = Math.min(best, octile(nodes[t].x - nodes[v].x, nodes[t].y - nodes[v].y));
+            else {
+                const cx = v % W, cy = (v / W) | 0;
+                for (const b of aim) best = Math.min(best, octileSteps(Math.max(0, b.x0 - cx, cx - b.x1), Math.max(0, b.y0 - cy, cy - b.y1)));
+            }
+            return best === Infinity ? 0 : best;
+        };
+        const relax = (v, c1, g1) => {
+            if (o.rest[v] < 0 || c1 > c[v] || (c1 === c[v] && g1 >= g[v])) return;
+            c[v] = c1; g[v] = g1;
+            heap.push((c1 + o.rest[v]) * BIG + g1 + h(v), v);
+        };
         heap.clear();
-        for (const [s, c0] of starts) relax(s, c0, 0);
-        while (heap.size && !done()) {
+        if (thin) for (const s of o.starts) relax(s >> 1, s & 1, 0);
+        else for (const s of tiles ? [o.src] : o.starts) { g[s] = 0; heap.push(h(s), s); }
+        while (heap.size && (thin || left.size)) {
             const u = heap.pop();
             if (closed[u]) continue;
             closed[u] = 1;
-            const s = settle(u);
-            if (s === 3) break;
-            if (s) {
-                for (const v of heap.drain()) if (!closed[v]) heap.push(key(v), v);
-                if (s === 1 || done()) continue;
+            if (thin) {
+                if (o.goal[u]) { found = g[u] / GRID; break; }
+            } else if (tiles ? left.delete(u) : left.has(u)) {
+                if (!tiles) {
+                    for (const k of goalOf.get(u)) if (res[k] === Infinity) res[k] = g[u] / GRID;
+                    for (const [cell, ks] of goalOf) if (left.has(cell) && ks.every(k => res[k] < Infinity)) left.delete(cell);
+                    aim = boxes.filter(b => res[b.k] === Infinity);
+                }
+                for (const v of heap.drain()) if (!closed[v]) heap.push(g[v] + h(v), v);
+                if (tiles || !left.size) continue;
             }
-            expand(u);
+            if (tiles) {
+                const a = nodes[u];
+                for (let v = 0; v < n; v++) {
+                    if (closed[v]) continue;
+                    const b = nodes[v], dx = b.x - a.x, dy = b.y - a.y;
+                    if (!tangentAt(a, dx, dy) || !tangentAt(b, dx, dy)) continue;
+                    const gv = g[u] + octile(dx, dy);
+                    if (gv >= g[v]) continue;
+                    if (!segmentClear(a, b)) continue;
+                    g[v] = gv;
+                    heap.push(gv + h(v), v);
+                }
+            } else for (let d = 0; d < 8; d++) {
+                const [ox, oy] = MOVES[d], gv = g[u] + (ox && oy ? Math.SQRT2 : 1);
+                if (thin) {
+                    const r = o.move(u, d);
+                    if (r >= 0) relax(r >> 1, c[u] + (r & 1), gv);
+                    continue;
+                }
+                const v = o.step(u, ox, oy);
+                if (v >= 0 && gv < g[v]) { g[v] = gv; heap.push(gv + h(v), v); }
+            }
         }
-        return result();
+        return tiles ? g : thin ? found : res;
     }
 
     function gridFrom(points, src, stairs, want) {
@@ -440,26 +428,27 @@ function createIdealWalk(px = 16, tkg) {
     }
 
     function bestPath(starts, isEnd, move, h, nearWall, rest) {
-        const S = freeW * freeH * 9;
-        const sc = new Int32Array(S), sa = new Int32Array(S).fill(-1), sb = new Int32Array(S), st = new Int32Array(S), sw = new Int32Array(S);
+        const S = freeW * freeH * 9, thin = rest !== undefined;
+        const sc = thin ? new Int32Array(S) : null, sa = new Int32Array(S).fill(-1), sb = new Int32Array(S), st = new Int32Array(S), sw = new Int32Array(S);
         const prev = new Int32Array(S).fill(-1), done = new Uint8Array(S);
         const better = (c1, a1, b1, t1, w1, i) => {
             if (sa[i] < 0) return true;
-            if (c1 !== sc[i]) return c1 < sc[i];
+            if (thin && c1 !== sc[i]) return c1 < sc[i];
             if (a1 === sa[i] && b1 === sb[i]) return t1 < st[i] || (t1 === st[i] && w1 < sw[i]);
             return a1 + b1 * Math.SQRT2 < sa[i] + sb[i] * Math.SQRT2;
         };
-        const heap = makeHeap((p, q) => p[0] !== q[0] ? p[0] < q[0] : Math.abs(p[1] - q[1]) > 1e-9 ? p[1] < q[1] : (p[2] - q[2] || p[3] - q[3]) < 0);
+        const heap = makeHeap((p, q) => Math.abs(p[0] - q[0]) > 1e-9 ? p[0] < q[0] : (p[1] - q[1] || p[2] - q[2]) < 0);
         for (const s of starts) {
             const u = s >> 1, i = u * 9 + 8, c1 = s & 1;
-            if (rest(u) < 0 || !better(c1, 0, 0, 0, 0, i)) continue;
-            sc[i] = c1; sa[i] = 0;
-            heap.push([c1 + rest(u), h(u), 0, 0, 0, 0, i, c1]);
+            if ((thin && rest(u) < 0) || !better(c1, 0, 0, 0, 0, i)) continue;
+            if (thin) sc[i] = c1;
+            sa[i] = 0;
+            heap.push(thin ? c1 + rest(u) : 0, [h(u), 0, 0, 0, 0, i, c1]);
         }
         let end = -1;
         while (heap.size) {
-            const [, , t, w, a, b, i, c] = heap.pop();
-            if (done[i] || c !== sc[i] || a !== sa[i] || b !== sb[i] || t !== st[i] || w !== sw[i]) continue;
+            const [, t, w, a, b, i, c] = heap.pop();
+            if (done[i] || (thin && c !== sc[i]) || a !== sa[i] || b !== sb[i] || t !== st[i] || w !== sw[i]) continue;
             done[i] = 1;
             const u = (i / 9) | 0, hd = i % 9;
             if (isEnd(u)) { end = i; break; }
@@ -468,9 +457,10 @@ function createIdealWalk(px = 16, tkg) {
                 if (r < 0) continue;
                 const v = r >> 1, c1 = c + (r & 1), a1 = a + (ox && oy ? 0 : 1), b1 = b + (ox && oy ? 1 : 0);
                 const t1 = t + (hd !== 8 && hd !== d ? 1 : 0), w1 = w + nearWall(v), j = v * 9 + d;
-                if (rest(v) < 0 || done[j] || !better(c1, a1, b1, t1, w1, j)) continue;
-                sc[j] = c1; sa[j] = a1; sb[j] = b1; st[j] = t1; sw[j] = w1; prev[j] = i;
-                heap.push([c1 + rest(v), a1 + b1 * Math.SQRT2 + h(v), t1, w1, a1, b1, j, c1]);
+                if ((thin && rest(v) < 0) || done[j] || !better(c1, a1, b1, t1, w1, j)) continue;
+                if (thin) sc[j] = c1;
+                sa[j] = a1; sb[j] = b1; st[j] = t1; sw[j] = w1; prev[j] = i;
+                heap.push(thin ? c1 + rest(v) : 0, [a1 + b1 * Math.SQRT2 + h(v), t1, w1, a1, b1, j, c1]);
             }
         }
         const cells = [];
@@ -499,7 +489,7 @@ function createIdealWalk(px = 16, tkg) {
         };
         const h = c => { let m = Infinity; for (const e of ends) m = Math.min(m, octileSteps(c % W - e % W, ((c / W) | 0) - ((e / W) | 0))); return m; };
         const move = (u, d) => { const v = step(u, MOVES[d][0], MOVES[d][1]); return v < 0 ? -1 : 2 * v; };
-        return pathPoints(bestPath(starts.map(u => 2 * u), u => ends.has(u), move, h, nearWall, () => 0));
+        return pathPoints(bestPath(starts.map(u => 2 * u), u => ends.has(u), move, h, nearWall));
     }
 
     var TERRAIN = {
